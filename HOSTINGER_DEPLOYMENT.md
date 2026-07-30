@@ -54,6 +54,7 @@ Set:
 
 - `WEBHOOK_TOKEN`
 - `MCP_TOKEN`
+- `MCP_ALLOWED_HOSTS` with your domain/IP values, for example `your-domain.com,your-domain.com:443,your-domain.com:4174`
 - `AI_SIGNALDESK_PUBLIC_URL`
 - `OPENROUTER_API_KEY`, if using chatbot
 - `N8N_LIVE_WEBHOOK_URL`, if using live update
@@ -70,7 +71,11 @@ Health checks:
 ```bash
 curl http://127.0.0.1:4173/api/health
 curl http://127.0.0.1:4173/api/digest/daily
-curl -N http://127.0.0.1:4174/mcp
+curl -X POST http://127.0.0.1:4174/mcp \
+  -H "Authorization: Bearer <MCP_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"curl","version":"1.0.0"}}}'
 ```
 
 The MCP endpoint expects POST requests from MCP clients:

@@ -22,6 +22,11 @@ const WEB_BASE_URL = (process.env.AI_SIGNALDESK_PUBLIC_URL || `http://localhost:
   "",
 );
 const MCP_TOKEN = process.env.MCP_TOKEN || process.env.WEBHOOK_TOKEN || "";
+const MCP_HOST = process.env.MCP_HOST || "0.0.0.0";
+const MCP_ALLOWED_HOSTS = csvList(
+  process.env.MCP_ALLOWED_HOSTS ||
+    `localhost,127.0.0.1,localhost:${PORT},127.0.0.1:${PORT},187.127.189.102,187.127.189.102:${PORT},srv1800336.hstgr.cloud,srv1800336.hstgr.cloud:${PORT}`,
+);
 
 const CATEGORY_ALIASES = {
   news: "News",
@@ -44,6 +49,13 @@ const CATEGORY_ALIASES = {
 function canonicalCategory(value = "") {
   const key = String(value).trim().toLowerCase();
   return CATEGORY_ALIASES[key] || String(value || "News").trim() || "News";
+}
+
+function csvList(value = "") {
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function escapeHtml(value = "") {
@@ -495,7 +507,7 @@ async function runStdio() {
 }
 
 async function runHttp() {
-  const app = createMcpExpressApp();
+  const app = createMcpExpressApp({ host: MCP_HOST, allowedHosts: MCP_ALLOWED_HOSTS });
   app.post("/mcp", async (req, res) => {
     const server = await buildServer();
     const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
@@ -519,8 +531,8 @@ async function runHttp() {
   app.delete("/mcp", (_req, res) => {
     res.status(405).json({ jsonrpc: "2.0", error: { code: -32000, message: "Method not allowed." }, id: null });
   });
-  app.listen(PORT, () => {
-    console.error(`AI SignalDesk MCP HTTP server running at http://localhost:${PORT}/mcp`);
+  app.listen(PORT, MCP_HOST, () => {
+    console.error(`AI SignalDesk MCP HTTP server running at http://${MCP_HOST}:${PORT}/mcp`);
   });
 }
 

@@ -44,6 +44,8 @@ services:
       NODE_ENV: production
       PORT: 4173
       MCP_PORT: 4174
+      MCP_HOST: ${MCP_HOST:-0.0.0.0}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1,localhost:4174,127.0.0.1:4174}
       MCP_TOKEN: ${MCP_TOKEN:?Set MCP_TOKEN in .env}
       WEBHOOK_TOKEN: ${WEBHOOK_TOKEN:?Set WEBHOOK_TOKEN in .env}
       AI_SIGNALDESK_PUBLIC_URL: ${AI_SIGNALDESK_PUBLIC_URL:-http://localhost:4173}

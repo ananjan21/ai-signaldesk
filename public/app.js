@@ -312,8 +312,68 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function isMarkdownTableSeparator(line) {
+  const cells = line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+  return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function markdownTableToHtml(lines) {
+  const header = lines[0]
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+  const rows = lines.slice(2).map((line) =>
+    line
+      .trim()
+      .replace(/^\|/, "")
+      .replace(/\|$/, "")
+      .split("|")
+      .map((cell) => cell.trim()),
+  );
+
+  return `<div class="chat-table-wrap"><table class="chat-table"><thead><tr>${header
+    .map((cell) => `<th>${escapeHtml(cell)}</th>`)
+    .join("")}</tr></thead><tbody>${rows
+    .map(
+      (row) =>
+        `<tr>${header
+          .map((_, index) => `<td>${escapeHtml(row[index] || "")}</td>`)
+          .join("")}</tr>`,
+    )
+    .join("")}</tbody></table></div>`;
+}
+
+function renderMarkdownTables(value) {
+  const lines = String(value ?? "").split(/\r?\n/);
+  const blocks = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const current = lines[index];
+    const next = lines[index + 1];
+    if (current?.includes("|") && next && isMarkdownTableSeparator(next)) {
+      const tableLines = [current, next];
+      index += 2;
+      while (index < lines.length && lines[index].includes("|") && lines[index].trim()) {
+        tableLines.push(lines[index]);
+        index += 1;
+      }
+      index -= 1;
+      blocks.push(markdownTableToHtml(tableLines));
+    } else {
+      blocks.push(escapeHtml(current));
+    }
+  }
+  return blocks.join("\n");
+}
+
 function renderRichText(value) {
-  let html = escapeHtml(value);
+  let html = renderMarkdownTables(value);
   html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   html = html.replace(
     /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
@@ -668,7 +728,8 @@ function renderChat() {
     bubble.className = `chat-message ${message.role}`;
     if (message.pending) bubble.classList.add("pending");
 
-    const text = document.createElement("p");
+    const text = document.createElement("div");
+    text.className = "chat-message-body";
     text.innerHTML = renderRichText(message.content);
     bubble.append(text);
 

@@ -670,6 +670,7 @@ async function handleChat(req, res) {
   const systemPrompt = [
     "You are the AI SignalDesk Copilot. Your role is to keep the user engaged and help them act quickly.",
     "Use the provided opportunity feed context whenever relevant. Every source item includes title, category, score, summary, and link.",
+    `The public app URL is ${OPENROUTER_SITE_URL}. Do not mention or link to other SignalDesk domains.`,
     "Answer in a polished, skimmable markdown style.",
     "When the user asks for an output mode, format the answer as the requested asset: LinkedIn Post, Newsletter Brief, Client Report, Prompt Pack, Image Creative Brief, or Research Digest.",
     "For image and visual marketing requests, include prompt ideas, best use case, suggested style, model suggestion, campaign angle, and source-backed context.",

@@ -652,9 +652,9 @@ function sanitizeLead(lead) {
     bounced: lead.bounced === true,
     paidAccessEnabled: lead.paidAccessEnabled === true,
     paidUsername: cleanText(lead.paidUsername || "", 120),
-    paidPasswordHash: cleanText(lead.paidPasswordHash || "", 240),
     paidPasswordSet: Boolean(lead.paidPasswordHash),
     paidPasswordUpdatedAt: cleanText(lead.paidPasswordUpdatedAt || "", 60) || null,
+    paidPasswordHash: undefined,
     createdAt: cleanText(lead.createdAt || "", 60),
     updatedAt: cleanText(lead.updatedAt || "", 60),
   };

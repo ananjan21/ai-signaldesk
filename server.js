@@ -22,6 +22,7 @@ const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 1024 * 1024);
 const MAX_POSTS_PER_REQUEST = Number(process.env.MAX_POSTS_PER_REQUEST || 50);
 const FUTURE_DATE_TOLERANCE_DAYS = Number(process.env.FUTURE_DATE_TOLERANCE_DAYS || 30);
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
+const LIVE_UPDATE_TIMEOUT_MS = Number(process.env.LIVE_UPDATE_TIMEOUT_MS || 25 * 1000);
 
 const rateLimitBuckets = new Map();
 
@@ -366,6 +367,151 @@ function validateItem(item) {
   if (!validHttpUrl(item.imageUrl)) errors.push("imageUrl must be a valid http or https URL.");
   if (Number.isNaN(new Date(item.publishedAt).getTime())) errors.push("publishedAt must be a valid date.");
   return errors;
+}
+
+async function fetchJson(url, timeoutMs = LIVE_UPDATE_TIMEOUT_MS) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/json", "User-Agent": "AI-SignalDesk/1.0" },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function scoreFor(category, index) {
+  const base = {
+    Jobs: 88,
+    Research: 84,
+    "AI Products": 82,
+    News: 76,
+    Updates: 74,
+  }[category] || 72;
+  return Math.max(55, base - index * 2);
+}
+
+async function fetchFallbackLiveSignals() {
+  const tasks = [
+    async () => {
+      const data = await fetchJson("https://remotive.com/api/remote-jobs?search=artificial%20intelligence&limit=10");
+      return (data.jobs || []).slice(0, 8).map((job, index) => ({
+        id: `remotive-${job.id}`,
+        title: job.title,
+        company: job.company_name || "Remotive",
+        link: job.url,
+        summary: cleanText(job.description || "", 420),
+        content: cleanText(job.description || "", 1600),
+        location: job.candidate_required_location || "Remote / Global",
+        publishedAt: job.publication_date || new Date().toISOString(),
+        category: "Jobs",
+        fitScore: scoreFor("Jobs", index),
+        tags: ["remote", "ai", ...(job.tags || []).slice(0, 5)],
+      }));
+    },
+    async () => {
+      const data = await fetchJson("https://hn.algolia.com/api/v1/search_by_date?query=artificial%20intelligence&tags=story");
+      return (data.hits || []).slice(0, 8).map((story, index) => ({
+        id: `hn-${story.objectID}`,
+        title: story.title || story.story_title,
+        company: "Hacker News",
+        link: story.url || `https://news.ycombinator.com/item?id=${story.objectID}`,
+        summary: `${story.points || 0} HN points and ${story.num_comments || 0} comments on an AI-related story.`,
+        content: story.title || story.story_title,
+        location: "Global",
+        publishedAt: story.created_at || new Date().toISOString(),
+        category: "News",
+        fitScore: scoreFor("News", index),
+        tags: ["hacker-news", "ai", "developer-signal"],
+      }));
+    },
+    async () => {
+      const data = await fetchJson(
+        "https://api.openalex.org/works?search=artificial%20intelligence&sort=publication_date:desc&per-page=8",
+      );
+      return (data.results || []).slice(0, 8).map((work, index) => ({
+        id: `openalex-${work.id}`.replace(/[^a-zA-Z0-9-]/g, "-").slice(0, 140),
+        title: work.title,
+        company: "OpenAlex",
+        link: work.doi || work.primary_location?.landing_page_url || work.id,
+        summary: cleanText(work.abstract_inverted_index ? "Recent AI research publication indexed by OpenAlex." : "Recent AI research signal from OpenAlex.", 420),
+        content: work.title,
+        location: "Global",
+        publishedAt: work.publication_date || new Date().toISOString(),
+        category: "Research",
+        fitScore: scoreFor("Research", index),
+        tags: ["research", "openalex", "ai"],
+      }));
+    },
+    async () => {
+      const data = await fetchJson(
+        "https://api.github.com/search/repositories?q=artificial-intelligence&sort=updated&order=desc&per_page=8",
+      );
+      return (data.items || []).slice(0, 8).map((repo, index) => ({
+        id: `github-${repo.id}`,
+        title: repo.full_name,
+        company: "GitHub",
+        link: repo.html_url,
+        summary: repo.description || `AI repository with ${repo.stargazers_count || 0} stars.`,
+        content: repo.description || repo.full_name,
+        location: "Global",
+        publishedAt: repo.updated_at || repo.created_at || new Date().toISOString(),
+        category: "AI Products",
+        fitScore: scoreFor("AI Products", index),
+        tags: ["github", "open-source", repo.language || "ai"].filter(Boolean),
+      }));
+    },
+    async () => {
+      const data = await fetchJson("https://huggingface.co/api/models?search=ai&sort=trendingScore&direction=-1&limit=8");
+      return (Array.isArray(data) ? data : []).slice(0, 8).map((model, index) => ({
+        id: `hf-${model.id}`.replace(/[^a-zA-Z0-9-]/g, "-").slice(0, 140),
+        title: model.id,
+        company: "Hugging Face",
+        link: `https://huggingface.co/${model.id}`,
+        summary: `Trending AI model with ${model.downloads || 0} downloads and ${model.likes || 0} likes.`,
+        content: model.id,
+        location: "Global",
+        publishedAt: model.lastModified || new Date().toISOString(),
+        category: "AI Products",
+        fitScore: scoreFor("AI Products", index),
+        tags: ["hugging-face", "model", ...(model.tags || []).slice(0, 4)],
+      }));
+    },
+  ];
+
+  const settled = await Promise.allSettled(tasks.map((task) => task()));
+  const items = settled.flatMap((result) => (result.status === "fulfilled" ? result.value : []));
+  const failures = settled
+    .map((result, index) => (result.status === "rejected" ? { index, error: result.reason?.message || String(result.reason) } : null))
+    .filter(Boolean);
+  return { items, failures };
+}
+
+async function saveIncomingItems(incoming, analyticsType, analyticsMeta = {}) {
+  const normalized = incoming.map(normalizeItem);
+  const validationErrors = normalized
+    .map((item, index) => ({ index, errors: validateItem(item) }))
+    .filter((result) => result.errors.length);
+  if (validationErrors.length) return { ok: false, validationErrors };
+
+  const existing = await readItems();
+  const byId = new Map(existing.map((item) => [item.id, item]));
+  for (const item of normalized) byId.set(item.id, item);
+  const next = Array.from(byId.values()).sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+  await writeItems(next);
+  await appendAnalytics({
+    id: crypto.randomUUID(),
+    type: analyticsType,
+    received: normalized.length,
+    total: next.length,
+    at: new Date().toISOString(),
+    ...analyticsMeta,
+  });
+  return { ok: true, normalized, total: next.length };
 }
 
 function sanitizeStoredItem(item) {
@@ -749,19 +895,25 @@ async function handleLiveUpdate(req, res) {
     });
   }
 
-  const response = await fetch(N8N_LIVE_WEBHOOK_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(N8N_LIVE_WEBHOOK_TOKEN ? { "x-live-update-token": N8N_LIVE_WEBHOOK_TOKEN } : {}),
-    },
-    body: JSON.stringify({
-      source: "webapp-live-button",
-      requestedAt: new Date().toISOString(),
-    }),
-  });
+  let response = { ok: false, status: 0 };
+  let text = "";
+  try {
+    response = await fetch(N8N_LIVE_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(N8N_LIVE_WEBHOOK_TOKEN ? { "x-live-update-token": N8N_LIVE_WEBHOOK_TOKEN } : {}),
+      },
+      body: JSON.stringify({
+        source: "webapp-live-button",
+        requestedAt: new Date().toISOString(),
+      }),
+    });
+    text = await response.text();
+  } catch (error) {
+    text = JSON.stringify({ error: error.message || String(error) });
+  }
 
-  const text = await response.text();
   let payload = null;
   try {
     payload = JSON.parse(text);
@@ -772,41 +924,51 @@ async function handleLiveUpdate(req, res) {
 
   const incoming = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
   if (response.ok && incoming.length) {
-    const normalized = incoming.map(normalizeItem);
-    const validationErrors = normalized
-      .map((item, index) => ({ index, errors: validateItem(item) }))
-      .filter((result) => result.errors.length);
-    if (validationErrors.length) {
-      return json(res, 422, { ok: false, error: "n8n returned invalid posts.", validationErrors });
-    }
-    const existing = await readItems();
-    const byId = new Map(existing.map((item) => [item.id, item]));
-    for (const item of normalized) byId.set(item.id, item);
-    const next = Array.from(byId.values()).sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-    await writeItems(next);
-    await appendAnalytics({
-      id: crypto.randomUUID(),
-      type: "live_update_success",
-      received: normalized.length,
-      total: next.length,
-      at: new Date().toISOString(),
-    });
+    const saved = await saveIncomingItems(incoming, "live_update_success", { provider: "n8n" });
+    if (!saved.ok) return json(res, 422, { ok: false, error: "n8n returned invalid posts.", validationErrors: saved.validationErrors });
 
     return json(res, 202, {
       ok: true,
       status: response.status,
       message: "Live update finished and saved real n8n data.",
-      received: normalized.length,
-      total: next.length,
+      provider: "n8n",
+      received: saved.normalized.length,
+      total: saved.total,
       counts: payload?.counts || null,
     });
   }
 
-  return json(res, response.ok ? 202 : 502, {
-    ok: response.ok,
+  const fallback = await fetchFallbackLiveSignals();
+  if (fallback.items.length) {
+    const saved = await saveIncomingItems(fallback.items, "live_update_fallback_success", {
+      provider: "direct-public-sources",
+      n8nStatus: response.status,
+      n8nResponse: text.slice(0, 500),
+      sourceFailures: fallback.failures,
+    });
+    if (!saved.ok) {
+      return json(res, 422, { ok: false, error: "Fallback sources returned invalid posts.", validationErrors: saved.validationErrors });
+    }
+    return json(res, 202, {
+      ok: true,
+      status: response.status,
+      provider: "direct-public-sources",
+      message: response.ok
+        ? "Live update saved direct public-source data because n8n returned no posts."
+        : "n8n live update failed, so SignalDesk saved direct public-source data.",
+      received: saved.normalized.length,
+      total: saved.total,
+      n8nResponse: text.slice(0, 500),
+      sourceFailures: fallback.failures,
+    });
+  }
+
+  return json(res, 502, {
+    ok: false,
     status: response.status,
-    message: response.ok ? "Live update finished, but n8n returned no posts." : "n8n live update failed.",
+    message: "n8n live update failed and fallback public sources returned no posts.",
     response: text.slice(0, 1000),
+    sourceFailures: fallback.failures,
   });
 }
 

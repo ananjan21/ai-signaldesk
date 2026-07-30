@@ -1,6 +1,6 @@
 # AI SignalDesk
 
-A local-first SaaS MVP that receives daily AI opportunity briefs from n8n and publishes them as a searchable website.
+A local-first SaaS MVP that receives daily AI opportunity briefs from an agentic AI pipeline and publishes them as a searchable website.
 
 The site can publish and score:
 
@@ -10,7 +10,7 @@ The site can publish and score:
 - AI tools and workflow updates
 - curated opportunities with fit scores and tags
 
-It also captures free-preview signups locally in `data/leads.json`, so the same user profiles can later power email, Telegram, or WhatsApp digests from n8n.
+It also captures free-preview signups locally in `data/leads.json`, so the same user profiles can later power email, Telegram, or WhatsApp digests from agentic AI automations.
 
 ## Run
 
@@ -45,20 +45,20 @@ Copy-Item .env.production.example .env
 docker compose up -d --build
 ```
 
-For Hostinger VPS, DNS, Nginx, HTTPS, n8n URL updates, and MCP deployment details, see `HOSTINGER_DEPLOYMENT.md`.
+For Hostinger VPS, DNS, HTTPS, live update, and MCP deployment details, see `HOSTINGER_DEPLOYMENT.md`.
 
 ## Local MVP
 
-Use an HTTP Request node after your daily trigger and content-generation steps.
+Use an HTTP request step after your daily trigger and content-generation steps.
 
 - Method: `POST`
 - URL: `http://localhost:4173/api/posts/daily`
 - Body Content Type: JSON
-- Body: use the mapping in `AISignal_n8n-http-request-example.json`
+- Body: use the mapping in the included agentic AI HTTP request example
 
-The endpoint is stable. Changing the n8n trigger schedule, sources, search terms, or AI prompt will change what appears on the site, but the website integration remains the same as long as the workflow posts JSON to `/api/posts/daily`.
+The endpoint is stable. Changing the agentic AI trigger schedule, sources, search terms, or AI prompt will change what appears on the site, but the website integration remains the same as long as the workflow posts JSON to `/api/posts/daily`.
 
-The bundled `AISignal_` workflows use free public read endpoints from Remotive, Hacker News/Algolia, OpenAlex or Semantic Scholar/arXiv, GitHub, DEV Community, and Hugging Face. The added sources provide hiring demand, open-source momentum, developer-content demand, and trending-model adoption signals without requiring paid API plans. Anonymous GitHub requests are rate limited, so the default once-daily schedule is recommended unless a server-side GitHub token is configured in n8n.
+The bundled agentic AI workflows use free public read endpoints from Remotive, Hacker News/Algolia, OpenAlex or Semantic Scholar/arXiv, GitHub, DEV Community, and Hugging Face. The added sources provide hiring demand, open-source momentum, developer-content demand, and trending-model adoption signals without requiring paid API plans. Anonymous GitHub requests are rate limited, so the default once-daily schedule is recommended unless a server-side GitHub token is configured in the automation layer.
 
 Each post gets a page:
 
@@ -72,7 +72,7 @@ http://localhost:4173/post/<id>
 {
   "id": "daily-ai-brief-2026-07-27",
   "title": "Daily AI Brief",
-  "publisher": "Curated by n8n",
+  "publisher": "Curated by agentic AI",
   "location": "Global",
   "category": "Research",
   "fitScore": 88,
@@ -93,12 +93,12 @@ Accepted category aliases include `news`, `updates`, `jobs`, `research`, `paper`
 $env:WEBHOOK_TOKEN="change-me"; npm start
 ```
 
-Then add either header in n8n:
+Then add either header in the agentic AI workflow:
 
 - `Authorization: Bearer change-me`
 - `x-webhook-token: change-me`
 
-The bundled workflows reference an n8n **Header Auth** credential named `AI SignalDesk Webhook`. Configure that credential with header name `Authorization` and value `Bearer <the same WEBHOOK_TOKEN>`. The secret stays in n8n credential storage and is not embedded in workflow code.
+The bundled workflows reference a protected `AI SignalDesk Webhook` credential. Configure that credential with header name `Authorization` and value `Bearer <the same WEBHOOK_TOKEN>`. The secret stays in credential storage and is not embedded in workflow code.
 
 Set `WEBHOOK_TOKEN` before exposing the app to the internet. It protects lead export, feed deletion, and any ingestion request when configured.
 
@@ -168,7 +168,7 @@ The formatted email digest is available at:
 GET /api/digest/daily.html
 ```
 
-n8n automation can use the JSON version:
+Agentic AI automation can use the JSON version:
 
 ```text
 GET /api/digest/daily
@@ -176,7 +176,7 @@ GET /api/digest/daily
 
 That returns `subject`, `preheader`, `html`, `text`, `counts`, and top feed `items`. Use the `html` field as the email body in a Gmail, SMTP, or SendGrid node.
 
-When `WEBHOOK_TOKEN` is set, leads can be exported for an n8n digest workflow with:
+When `WEBHOOK_TOKEN` is set, leads can be exported for an agentic AI digest workflow with:
 
 ```text
 GET /api/leads
@@ -237,7 +237,7 @@ Claude Desktop-style config:
   "mcpServers": {
     "ai-signaldesk": {
       "command": "node",
-      "args": ["H:\\n8nDailyRashi\\mcp-server.mjs"],
+      "args": ["H:\\ai-signaldesk\\mcp-server.mjs"],
       "env": {
         "AI_SIGNALDESK_PUBLIC_URL": "http://localhost:4173",
         "MCP_TOKEN": "change-me"
@@ -286,7 +286,7 @@ Readable MCP resources:
 1. Run the webapp locally with `npm start`.
 2. Open `http://localhost:4173`.
 3. Test search, filters, post detail pages, and preview signup.
-4. Send a test item from n8n to `http://localhost:4173/api/posts/daily`.
+4. Send a test item from the agentic AI workflow to `http://localhost:4173/api/posts/daily`.
 5. Check `GET /api/health`.
 6. Preview the digest at `GET /api/digest/daily.html`.
 7. Export leads with `GET /api/leads.csv` after setting `WEBHOOK_TOKEN`.
@@ -294,11 +294,10 @@ Readable MCP resources:
 
 ## Real Data Workflow
 
-Created in n8n:
+Created in the agentic AI automation platform:
 
 ```text
 AI Research Opportunity Desk - Real Data v3
-https://n8n.ailabworks.tech/workflow/fjqZnw4JVSWBNgi5
 ```
 
 It collects real data from:
@@ -316,17 +315,17 @@ It runs at:
 It also exposes a live webhook path:
 
 ```text
-https://n8n.ailabworks.tech/webhook/ai-opportunity-live-update
+https://your-agentic-ai-domain.example/webhook/ai-opportunity-live-update
 ```
 
 For the homepage **Live update** button, set:
 
 ```powershell
-$env:N8N_LIVE_WEBHOOK_URL="https://n8n.ailabworks.tech/webhook/ai-opportunity-live-update"
+$env:N8N_LIVE_WEBHOOK_URL="https://your-agentic-ai-domain.example/webhook/ai-opportunity-live-update"
 npm start
 ```
 
-Because this n8n instance is remote, it cannot post to your Windows `localhost`. For full live publishing, update the workflow node **Publish to Opportunity Desk** from:
+Because the agentic AI automation platform is remote, it cannot post to your Windows `localhost`. For full live publishing, update the workflow node **Publish to Opportunity Desk** from:
 
 ```text
 http://localhost:4173/api/posts/daily

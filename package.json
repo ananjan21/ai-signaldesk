@@ -2,7 +2,7 @@
   "name": "ai-research-job-alerts-dashboard",
   "version": "1.0.0",
   "private": true,
-  "description": "AI SignalDesk business and AI opportunity intelligence powered by n8n.",
+  "description": "AI SignalDesk business and AI opportunity intelligence powered by agentic AI.",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",

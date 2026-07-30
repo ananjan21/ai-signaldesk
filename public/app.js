@@ -71,19 +71,21 @@ const sampleItems = [
   {
     id: "sample-ai-daily-brief",
     title: "Daily AI Brief: Research, Jobs, Startups",
-    company: "n8n workflow preview",
+    company: "Agentic AI preview",
     location: "Remote / Global",
     category: "News",
     fitScore: 92,
     publishedAt: new Date().toISOString(),
-    summary: "A preview item showing how daily news, research, job, and startup signals will appear after n8n publishes.",
+    summary: "A preview item showing how daily news, research, job, and startup signals will appear after the agentic AI sync publishes.",
     content:
-      "This is a sample daily post. Replace the old email action in n8n with an HTTP Request node that posts to /api/posts/daily.\n\nThe same endpoint can receive multiple categories: News, Updates, Jobs, Research, Startup News, Funding, Tools, or any custom label your workflow generates.",
-    tags: ["Daily Brief", "AI", "n8n"],
+      "This is a sample daily post. The agentic AI sync can post to /api/posts/daily.\n\nThe same endpoint can receive multiple categories: News, Updates, Jobs, Research, Startup News, Funding, Tools, or any custom label your automation generates.",
+    tags: ["Daily Brief", "AI", "agentic-ai"],
     link: "",
     imageUrl: "",
   },
 ];
+
+const preferredCategories = ["News", "Updates", "AI Products", "Prompts", "Image Prompts", "Jobs", "Research", "Startup News"];
 
 function canonicalCategory(value) {
   const normalized = String(value || "").trim().toLowerCase();
@@ -176,6 +178,29 @@ function filteredItems() {
   });
 }
 
+function categoryCounts(items = state.items) {
+  return items.reduce((bucket, item) => {
+    const category = canonicalCategory(item.category);
+    bucket[category] = (bucket[category] || 0) + 1;
+    return bucket;
+  }, {});
+}
+
+function updateCategoryControls(counts = categoryCounts()) {
+  for (const button of categoryButtons) {
+    const category = button.dataset.category;
+    button.hidden = category !== "all" && !counts[category];
+  }
+
+  for (const button of contextButtons) {
+    button.hidden = !counts[button.dataset.category];
+  }
+
+  for (const button of mixButtons) {
+    button.hidden = !counts[button.dataset.category];
+  }
+}
+
 function updateMetrics(items) {
   document.querySelector("#totalAlerts").textContent = state.items.length;
   document.querySelector("#todayAlerts").textContent = state.items.filter((item) => isToday(item.publishedAt)).length;
@@ -189,11 +214,8 @@ function updateMetrics(items) {
 }
 
 function updateContextPanel() {
-  const counts = state.items.reduce((bucket, item) => {
-    const category = canonicalCategory(item.category);
-    bucket[category] = (bucket[category] || 0) + 1;
-    return bucket;
-  }, {});
+  const counts = categoryCounts();
+  updateCategoryControls(counts);
 
   document.querySelector("#contextTotal").textContent = `${state.items.length} live item${state.items.length === 1 ? "" : "s"}`;
   document.querySelector("#contextNews").textContent = counts.News || 0;
@@ -243,9 +265,9 @@ function updateContextPanel() {
 }
 
 function populateCategories() {
-  const preferred = ["News", "Updates", "AI Products", "Prompts", "Image Prompts", "Jobs", "Research", "Startup News"];
   const discovered = state.items.map((item) => canonicalCategory(item.category)).filter(Boolean);
-  const categories = [...new Set([...preferred, ...discovered])];
+  const counts = categoryCounts();
+  const categories = [...new Set([...preferredCategories, ...discovered])].filter((category) => counts[category] > 0);
   const current = categoryFilter.value;
   categoryFilter.innerHTML = '<option value="all">All categories</option>';
 
@@ -257,6 +279,8 @@ function populateCategories() {
   }
 
   categoryFilter.value = categories.includes(current) ? current : "all";
+  state.category = categoryFilter.value;
+  updateCategoryControls(counts);
 }
 
 function setCategory(category) {
@@ -380,7 +404,7 @@ function categoryCover(category) {
 }
 
 function sourceLabel(item) {
-  return item.publisher || item.company || "Curated by n8n";
+  return item.publisher || item.company || "Curated by agentic AI";
 }
 
 function renderCardVisual(item) {
@@ -501,7 +525,7 @@ function renderImagePromptBrief(item) {
 function renderSpotlight(items) {
   spotlight.replaceChildren();
   const item = items[0] || state.items[0];
-  document.querySelector("#spotlightDate").textContent = item ? formatDate(item.publishedAt) : "Waiting for n8n";
+  document.querySelector("#spotlightDate").textContent = item ? formatDate(item.publishedAt) : "Waiting for agentic AI";
 
   if (!item) {
     spotlight.className = "spotlight-post empty";
@@ -522,7 +546,7 @@ function renderSpotlight(items) {
   const meta = document.createElement("div");
   meta.className = "alert-meta";
   appendMeta(meta, [
-    item.company || "Curated by n8n",
+    item.company || "Curated by agentic AI",
     item.location || "Remote / Global",
     canonicalCategory(item.category),
     formatDate(item.publishedAt),

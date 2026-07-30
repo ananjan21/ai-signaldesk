@@ -5,8 +5,7 @@ const crypto = require("node:crypto");
 
 const PORT = Number(process.env.PORT || 4173);
 const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN || "";
-const N8N_LIVE_WEBHOOK_URL =
-  process.env.N8N_LIVE_WEBHOOK_URL || "https://n8n.ailabworks.tech/webhook/ai-opportunity-real-data-pull-v2";
+const N8N_LIVE_WEBHOOK_URL = process.env.N8N_LIVE_WEBHOOK_URL || "";
 const N8N_LIVE_WEBHOOK_TOKEN = process.env.N8N_LIVE_WEBHOOK_TOKEN || "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "google/gemini-3.5-flash-lite";
@@ -390,7 +389,7 @@ function normalizeItem(input) {
   const warnings = [];
   const title = cleanText(firstValue(source, ["title", "headline", "jobTitle", "position"], ""), 180);
   const company = cleanText(
-    firstValue(source, ["company", "organization", "employer", "source", "publisher"], "Curated by n8n"),
+    firstValue(source, ["company", "organization", "employer", "source", "publisher"], "Curated by agentic AI"),
     140,
   );
   const link = cleanText(firstValue(source, ["link", "url", "applyUrl", "sourceUrl"], ""), 900);
@@ -912,7 +911,7 @@ function renderDigestItem(item) {
   return `<tr>
     <td style="padding:16px 0;border-top:1px solid #d9e2ea">
       <div style="font-size:12px;color:#647080;font-weight:800;text-transform:uppercase">${escapeHtml(
-        item.company || "Curated by n8n",
+        item.company || "Curated by agentic AI",
       )} · ${escapeHtml(item.location || "Remote / Global")} · ${escapeHtml(String(item.fitScore || "New"))}${item.fitScore ? "% priority" : ""}</div>
       <h3 style="margin:7px 0 8px;color:#111827;font-size:18px;line-height:1.25">${escapeHtml(item.title)}</h3>
       <p style="margin:0 0 10px;color:#334155;font-size:14px;line-height:1.55">${escapeHtml(
@@ -966,7 +965,7 @@ function renderDailyDigestHtml(items) {
             <tr>
               <td style="padding:24px 28px">
                 <p style="margin:0 0 18px;color:#334155;font-size:15px;line-height:1.6">Here is today's formatted AI opportunity brief, ranked for action and grouped by market signal.</p>
-                ${sections || `<p style="color:#647080">No digest items are available yet. Run the live n8n update to refresh the feed.</p>`}
+                ${sections || `<p style="color:#647080">No digest items are available yet. Run the live agentic AI update to refresh the feed.</p>`}
                 <div style="margin-top:28px;padding:16px;border:1px solid #d9e2ea;border-radius:8px;background:#f3fbfb">
                   <strong style="color:#075f56">Next action</strong>
                   <p style="margin:6px 0 0;color:#334155;line-height:1.55">Pick one opportunity, turn it into a LinkedIn post, research digest, prompt pack, or image creative brief, and link back to the original source.</p>
@@ -1018,8 +1017,8 @@ async function handleLiveUpdate(req, res) {
   if (!N8N_LIVE_WEBHOOK_URL) {
     return json(res, 503, {
       ok: false,
-      error: "Live n8n webhook is not configured.",
-      setup: "Set N8N_LIVE_WEBHOOK_URL to the production webhook URL from the n8n workflow.",
+      error: "Live agentic AI update is not configured.",
+      setup: "Set the live update webhook URL for the production agentic AI workflow.",
     });
   }
 
@@ -1052,14 +1051,14 @@ async function handleLiveUpdate(req, res) {
 
   const incoming = Array.isArray(payload) ? payload : Array.isArray(payload?.items) ? payload.items : [];
   if (response.ok && incoming.length) {
-    const saved = await saveIncomingItems(incoming, "live_update_success", { provider: "n8n" });
-    if (!saved.ok) return json(res, 422, { ok: false, error: "n8n returned invalid posts.", validationErrors: saved.validationErrors });
+    const saved = await saveIncomingItems(incoming, "live_update_success", { provider: "agentic-ai" });
+    if (!saved.ok) return json(res, 422, { ok: false, error: "Agentic AI returned invalid posts.", validationErrors: saved.validationErrors });
 
     return json(res, 202, {
       ok: true,
       status: response.status,
-      message: "Live update finished and saved real n8n data.",
-      provider: "n8n",
+      message: "Live update finished and saved real agentic AI data.",
+      provider: "agentic-ai",
       received: saved.normalized.length,
       total: saved.total,
       counts: payload?.counts || null,
@@ -1070,8 +1069,8 @@ async function handleLiveUpdate(req, res) {
   if (fallback.items.length) {
     const saved = await saveIncomingItems(fallback.items, "live_update_fallback_success", {
       provider: "direct-public-sources",
-      n8nStatus: response.status,
-      n8nResponse: text.slice(0, 500),
+      agenticAiStatus: response.status,
+      agenticAiResponse: text.slice(0, 500),
       sourceFailures: fallback.failures,
     });
     if (!saved.ok) {
@@ -1082,11 +1081,11 @@ async function handleLiveUpdate(req, res) {
       status: response.status,
       provider: "direct-public-sources",
       message: response.ok
-        ? "Live update saved direct public-source data because n8n returned no posts."
-        : "n8n live update failed, so SignalDesk saved direct public-source data.",
+        ? "Live update saved direct public-source data because agentic AI returned no posts."
+        : "Agentic AI live update failed, so SignalDesk saved direct public-source data.",
       received: saved.normalized.length,
       total: saved.total,
-      n8nResponse: text.slice(0, 500),
+      agenticAiResponse: text.slice(0, 500),
       sourceFailures: fallback.failures,
     });
   }
@@ -1094,7 +1093,7 @@ async function handleLiveUpdate(req, res) {
   return json(res, 502, {
     ok: false,
     status: response.status,
-    message: "n8n live update failed and fallback public sources returned no posts.",
+    message: "Agentic AI live update failed and fallback public sources returned no posts.",
     response: text.slice(0, 1000),
     sourceFailures: fallback.failures,
   });
@@ -1405,7 +1404,7 @@ async function handleHealth(req, res) {
     configured: {
       webhookToken: Boolean(WEBHOOK_TOKEN),
       openRouter: Boolean(OPENROUTER_API_KEY),
-      n8nLiveWebhook: Boolean(N8N_LIVE_WEBHOOK_URL),
+      agenticAiLiveUpdate: Boolean(N8N_LIVE_WEBHOOK_URL),
     },
     counts: {
       posts: items.length,
@@ -1573,7 +1572,7 @@ function renderPostPage(item) {
       ${imageMarkup}
       <article class="post-article">
         <div class="alert-meta">
-          <span>${escapeHtml(item.company || "Curated by n8n")}</span>
+          <span>${escapeHtml(item.company || "Curated by agentic AI")}</span>
           <span>${escapeHtml(item.location || "Remote / Global")}</span>
           <span>${escapeHtml(canonicalCategory(item.category))}</span>
           <span>${escapeHtml(new Date(item.publishedAt).toLocaleString())}</span>
@@ -1637,7 +1636,7 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   logInfo("AI Intelligence Desk website running", { url: `http://localhost:${PORT}` });
-  logInfo("n8n daily POST endpoint ready", {
+  logInfo("agentic AI daily POST endpoint ready", {
     endpoint: "/api/posts/daily",
     webhookProtected: Boolean(WEBHOOK_TOKEN),
   });

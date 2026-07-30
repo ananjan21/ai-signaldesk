@@ -2194,6 +2194,160 @@ body {
   .paid-brief-list {
     grid-template-columns: 1fr;
   }
+
+  .paid-beta-body .topbar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .paid-beta-body .topnav {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .paid-beta-body .topnav a {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+
+  .paid-beta-page,
+  .paid-login-shell {
+    width: min(100% - 28px, 1180px);
+  }
+
+  .paid-beta-hero {
+    padding: 28px;
+  }
+
+  .paid-member-panel .admin-header {
+    align-items: stretch;
+  }
+
+  .paid-member-panel .admin-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .paid-member-panel .admin-actions a,
+  .paid-member-panel .admin-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 590px) {
+  .paid-beta-body .topbar {
+    min-height: auto;
+    padding: 12px 14px;
+  }
+
+  .paid-beta-body .brand-lockup {
+    align-items: center;
+    min-width: 0;
+  }
+
+  .paid-beta-body .brand-lockup h1 {
+    font-size: 1rem;
+  }
+
+  .paid-beta-body .brand-lockup p {
+    display: block;
+    max-width: 230px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .paid-beta-body .topnav {
+    gap: 6px;
+  }
+
+  .paid-beta-body .topnav a {
+    min-height: 38px;
+    padding: 0 11px;
+    font-size: 0.78rem;
+  }
+
+  .paid-beta-page,
+  .paid-login-shell {
+    width: min(100% - 20px, 1180px);
+    margin-top: 16px;
+    margin-bottom: 34px;
+  }
+
+  .paid-beta-hero,
+  .paid-login-panel,
+  .paid-member-panel,
+  .paid-brief,
+  .paid-assets {
+    padding: 18px;
+  }
+
+  .paid-beta-hero {
+    gap: 18px;
+  }
+
+  .paid-beta-hero h2,
+  .paid-login-panel h2,
+  .paid-brief h2 {
+    font-size: clamp(1.85rem, 10vw, 2.55rem);
+    line-height: 1.04;
+  }
+
+  .paid-beta-hero p,
+  .paid-login-panel p {
+    font-size: 0.95rem;
+    line-height: 1.55;
+  }
+
+  .paid-beta-hero aside {
+    padding: 18px;
+  }
+
+  .paid-beta-hero ul {
+    padding-left: 18px;
+  }
+
+  .paid-beta-hero .primary-link,
+  .paid-beta-hero .secondary-link,
+  .paid-login-panel button,
+  .paid-beta-signup button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .paid-login-panel {
+    margin-top: 18px;
+  }
+
+  .paid-member-grid article {
+    min-height: auto;
+  }
+
+  .paid-member-panel .admin-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .paid-brief-list {
+    gap: 10px;
+  }
+
+  .paid-brief article,
+  .paid-member-grid article {
+    padding: 14px;
+  }
+
+  .paid-assets div {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .paid-assets a {
+    justify-content: center;
+  }
 }
 
 .admin-empty {

@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI SignalDesk Admin</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="admin-body">
+    <main class="admin-shell">
+      <section class="admin-login" id="loginPanel">
+        <p class="eyebrow">Private admin</p>
+        <h1>AI SignalDesk subscriber panel</h1>
+        <p>Sign in with the server admin token to view subscribers, dates, interests, and email delivery tracking.</p>
+        <form id="adminLoginForm" class="admin-login-form">
+          <label>
+            Admin token
+            <input id="adminToken" type="password" autocomplete="current-password" placeholder="Paste WEBHOOK_TOKEN" required />
+          </label>
+          <button type="submit">Open admin panel</button>
+        </form>
+        <p id="loginStatus" class="form-status" aria-live="polite"></p>
+      </section>
+
+      <section class="admin-dashboard" id="dashboardPanel" hidden>
+        <header class="admin-header">
+          <div>
+            <p class="eyebrow">AI SignalDesk Admin</p>
+            <h1>Subscribers & delivery tracking</h1>
+            <p>Created by Dr. Ananjan Maiti</p>
+          </div>
+          <div class="admin-actions">
+            <a id="csvDownload" href="/api/leads.csv">Download CSV</a>
+            <button id="refreshAdmin" type="button">Refresh</button>
+            <button id="logoutAdmin" type="button">Logout</button>
+          </div>
+        </header>
+
+        <div class="admin-metrics" aria-label="Admin metrics">
+          <article><span>Total subscribers</span><strong id="metricSubscribers">0</strong></article>
+          <article><span>Active subscribers</span><strong id="metricActive">0</strong></article>
+          <article><span>Email forwards</span><strong id="metricForwards">0</strong></article>
+          <article><span>Latest forward</span><strong id="metricLatest">-</strong></article>
+        </div>
+
+        <div class="admin-toolbar">
+          <label>
+            Search
+            <input id="subscriberSearch" type="search" placeholder="Email, name, role, interest..." />
+          </label>
+          <label>
+            Status
+            <select id="subscriberStatus">
+              <option value="all">All</option>
+              <option value="active">Active</option>
+              <option value="inactive">Inactive</option>
+            </select>
+          </label>
+          <span id="adminStatus" class="form-status" aria-live="polite"></span>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Name / role</th>
+                <th>Interests</th>
+                <th>Delivery</th>
+                <th>Dates</th>
+                <th>Email forwards</th>
+              </tr>
+            </thead>
+            <tbody id="subscriberRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+    <script src="/admin.js"></script>
+  </body>
+</html>

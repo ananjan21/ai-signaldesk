@@ -574,8 +574,32 @@ function normalizeLead(input) {
     digestFormat,
     subscribed,
     plan: "free-preview",
+    emailForwardCount: Math.max(0, Number(input.emailForwardCount || input.emailForwards || 0) || 0),
+    lastEmailForwardedAt: cleanText(input.lastEmailForwardedAt || "", 60) || null,
+    lastEmailSubject: cleanText(input.lastEmailSubject || "", 180),
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+  };
+}
+
+function sanitizeLead(lead) {
+  return {
+    ...lead,
+    id: cleanText(lead.id, 80),
+    email: cleanText(lead.email, 254).toLowerCase(),
+    name: cleanText(lead.name, 120),
+    role: cleanText(lead.role, 80),
+    channel: cleanText(lead.channel || "email", 30).toLowerCase(),
+    interests: normalizeArray(lead.interests).map((interest) => cleanText(interest, 80)),
+    frequency: cleanText(lead.frequency || "daily", 30).toLowerCase(),
+    digestFormat: cleanText(lead.digestFormat || "html", 30).toLowerCase(),
+    subscribed: lead.subscribed !== false,
+    plan: cleanText(lead.plan || "free-preview", 80),
+    emailForwardCount: Math.max(0, Number(lead.emailForwardCount || lead.emailForwards || 0) || 0),
+    lastEmailForwardedAt: cleanText(lead.lastEmailForwardedAt || "", 60) || null,
+    lastEmailSubject: cleanText(lead.lastEmailSubject || "", 180),
+    createdAt: cleanText(lead.createdAt || "", 60),
+    updatedAt: cleanText(lead.updatedAt || "", 60),
   };
 }
 
@@ -649,7 +673,19 @@ async function handleLeadSignup(req, res) {
   const leads = await readLeads();
   const byId = new Map(leads.map((item) => [item.id, item]));
   const existing = byId.get(lead.id);
-  byId.set(lead.id, existing ? { ...existing, ...lead, createdAt: existing.createdAt } : lead);
+  byId.set(
+    lead.id,
+    existing
+      ? {
+          ...existing,
+          ...lead,
+          emailForwardCount: existing.emailForwardCount || 0,
+          lastEmailForwardedAt: existing.lastEmailForwardedAt || null,
+          lastEmailSubject: existing.lastEmailSubject || "",
+          createdAt: existing.createdAt,
+        }
+      : lead,
+  );
   const next = Array.from(byId.values()).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
   await writeLeads(next);
   await appendAnalytics({
@@ -1054,6 +1090,9 @@ function leadsToCsv(leads) {
     "digestFormat",
     "subscribed",
     "plan",
+    "emailForwardCount",
+    "lastEmailForwardedAt",
+    "lastEmailSubject",
     "createdAt",
     "updatedAt",
   ];
@@ -1063,6 +1102,75 @@ function leadsToCsv(leads) {
       .join(","),
   );
   return `${headers.join(",")}\n${rows.join("\n")}\n`;
+}
+
+function adminSummary({ leads, analytics, items }) {
+  const sanitizedLeads = leads.map(sanitizeLead);
+  const activeSubscribers = sanitizedLeads.filter((lead) => lead.subscribed);
+  const totalEmailForwards = sanitizedLeads.reduce((sum, lead) => sum + Number(lead.emailForwardCount || 0), 0);
+  const latestForward = sanitizedLeads
+    .map((lead) => lead.lastEmailForwardedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+
+  return {
+    ok: true,
+    counts: {
+      subscribers: sanitizedLeads.length,
+      activeSubscribers: activeSubscribers.length,
+      totalEmailForwards,
+      posts: items.length,
+      analytics: analytics.length,
+    },
+    latestForward: latestForward || null,
+    leads: sanitizedLeads,
+    recentAnalytics: analytics.slice(0, 50),
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+async function handleAdminSummary(req, res) {
+  const auth = requireWebhookToken(req, res);
+  if (!auth.ok) return auth.response;
+  const [items, leads, analytics] = await Promise.all([readItems(), readLeads(), readAnalytics()]);
+  return json(res, 200, adminSummary({ items, leads, analytics }));
+}
+
+async function handleEmailForward(req, res) {
+  const auth = requireWebhookToken(req, res);
+  if (!auth.ok) return auth.response;
+  const body = await readBody(req);
+  const email = cleanText(body.email || "", 254).toLowerCase();
+  const id = cleanText(body.id || "", 80);
+  const subject = cleanText(body.subject || body.lastEmailSubject || "Daily AI Opportunity Intelligence", 180);
+  const increment = Math.max(1, Number(body.count || body.increment || 1) || 1);
+  if (!email && !id) return json(res, 400, { ok: false, error: "Provide subscriber email or id." });
+
+  const leads = await readLeads();
+  const index = leads.findIndex((lead) => (id && lead.id === id) || (email && String(lead.email).toLowerCase() === email));
+  if (index === -1) return json(res, 404, { ok: false, error: "Subscriber not found." });
+
+  const now = new Date().toISOString();
+  const lead = sanitizeLead(leads[index]);
+  leads[index] = {
+    ...lead,
+    emailForwardCount: Number(lead.emailForwardCount || 0) + increment,
+    lastEmailForwardedAt: now,
+    lastEmailSubject: subject,
+    updatedAt: now,
+  };
+  await writeLeads(leads.map(sanitizeLead).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+  await appendAnalytics({
+    id: crypto.randomUUID(),
+    type: "email_forward_recorded",
+    leadId: leads[index].id,
+    emailHash: crypto.createHash("sha256").update(leads[index].email).digest("hex").slice(0, 18),
+    subject,
+    increment,
+    at: now,
+  });
+  return json(res, 200, { ok: true, lead: sanitizeLead(leads[index]) });
 }
 
 async function handleHealth(req, res) {
@@ -1152,6 +1260,14 @@ async function handleApi(req, res, url) {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": "attachment; filename=\"ai-signaldesk-leads.csv\"",
     });
+  }
+
+  if (url.pathname === "/api/admin/summary" && req.method === "GET") {
+    return handleAdminSummary(req, res);
+  }
+
+  if (url.pathname === "/api/admin/email-forward" && req.method === "POST") {
+    return handleEmailForward(req, res);
   }
 
   if (url.pathname === "/api/live-update" && req.method === "POST") {
@@ -1248,7 +1364,7 @@ async function servePost(req, res, url) {
 }
 
 async function serveStatic(req, res, url) {
-  const requested = url.pathname === "/" ? "/index.html" : decodeURIComponent(url.pathname);
+  const requested = url.pathname === "/" ? "/index.html" : url.pathname === "/admin" ? "/admin.html" : decodeURIComponent(url.pathname);
   const filePath = path.normalize(path.join(PUBLIC_DIR, requested));
   if (!filePath.startsWith(PUBLIC_DIR)) {
     return send(res, 403, "Forbidden", { "Content-Type": "text/plain; charset=utf-8" });

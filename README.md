@@ -183,6 +183,23 @@ GET /api/leads
 Authorization: Bearer change-me
 ```
 
+## Admin Subscriber Panel
+
+Open the private admin page at:
+
+```text
+/admin
+```
+
+Sign in with `WEBHOOK_TOKEN`. The panel shows subscriber emails, roles, interests, signup/update dates, active status, and email delivery counters. After an email workflow sends or forwards a digest, record that event with:
+
+```text
+POST /api/admin/email-forward
+Authorization: Bearer change-me
+```
+
+Send JSON such as `{ "email": "subscriber@example.com", "subject": "Daily AI Opportunity Intelligence" }`.
+
 ## MCP Connector
 
 AI SignalDesk includes a Model Context Protocol server so ChatGPT, Claude Desktop, Claude Code, Cursor, Codex, and other MCP clients can inspect the feed, digest, sources, subscribers, and visual assets.

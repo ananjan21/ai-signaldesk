@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI SignalDesk | Business & AI Intelligence</title>
+    <meta
+      name="description"
+      content="Daily decision-ready intelligence on AI business, products, jobs, research, prompts, and visual marketing trends."
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="/assets/hero-ai-opportunity-radar.jpg"
+      media="(min-width: 881px)"
+    />
+    <link
+      rel="preload"
+      as="image"
+      href="/assets/hero-ai-opportunity-radar-mobile.jpg"
+      media="(max-width: 880px)"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand-lockup">
+        <span class="brand-mark signal-mark" aria-hidden="true">
+          <span></span><span></span><span></span><span></span>
+        </span>
+        <div>
+          <h1><span>AI</span> SignalDesk</h1>
+          <p>Business &amp; AI Intelligence</p>
+        </div>
+      </div>
+      <nav class="topnav" aria-label="Primary navigation">
+        <a href="#dailyFeed">Today</a>
+        <a href="#intelligenceMix">Intelligence</a>
+        <a href="#aiChat">Copilot</a>
+        <a href="#joinPreview">Subscribe</a>
+        <div class="status-pill" id="syncStatus">Syncing</div>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero-panel intelligence-dashboard">
+        <div class="hero-copy">
+          <p class="eyebrow" id="briefingDate">Today&apos;s AI market briefing</p>
+          <h2>Today&apos;s AI opportunity radar.</h2>
+          <p>
+            A live, ranked view of the jobs, research, products, and market shifts worth acting on now.
+          </p>
+          <div class="hero-actions">
+            <button id="dailyBriefButton" class="primary-link daily-brief-button" type="button">Build today&apos;s brief</button>
+            <a href="#dailyFeed" class="secondary-link">Explore leading signals</a>
+            <button id="liveUpdateButton" class="live-button" type="button">Refresh intelligence</button>
+          </div>
+          <div class="dashboard-metrics" aria-label="Live intelligence metrics">
+            <article>
+              <span>Signals tracked</span>
+              <strong id="heroTotalSignals">0</strong>
+            </article>
+            <article>
+              <span>High priority</span>
+              <strong id="heroHighSignals">0</strong>
+            </article>
+            <article>
+              <span>Added today</span>
+              <strong id="heroTodaySignals">0</strong>
+            </article>
+          </div>
+          <div class="source-proof" aria-label="Connected intelligence sources">
+            <span><i class="source-dot remotive"></i>Remotive</span>
+            <span><i class="source-dot hackernews"></i>Hacker News</span>
+            <span><i class="source-dot openalex"></i>OpenAlex</span>
+          </div>
+        </div>
+        <picture class="hero-art" aria-hidden="true">
+          <img
+            src="/assets/hero-ai-opportunity-radar-mobile.jpg"
+            alt=""
+            width="1122"
+            height="1402"
+            decoding="async"
+          />
+        </picture>
+        <aside class="context-panel" aria-label="Today's market pulse">
+          <div class="context-header">
+            <span>Today&apos;s market pulse</span>
+            <strong id="contextTotal">0 live items</strong>
+          </div>
+          <div id="contextEmptyState" class="product-state context-empty-state" hidden>
+            <img
+              src="/assets/states/state-empty-analytics.webp"
+              alt="An idle signal scanner waiting for activity data"
+              width="800"
+              height="600"
+              loading="lazy"
+            />
+            <strong>No signal activity yet</strong>
+            <span>Metrics will populate after the first successful intelligence sync.</span>
+          </div>
+          <div class="lead-signal">
+            <span id="contextLeadCategory">Leading signal</span>
+            <a id="contextLeadTitle" href="#dailyFeed">Scanning today&apos;s intelligence...</a>
+            <p id="contextLeadSummary">The highest-priority development will appear here.</p>
+          </div>
+          <div class="signal-rail" id="signalRail" aria-label="Highest-ranked signals">
+            <article><span>01</span><p>Ranking live intelligence...</p><strong>Live</strong></article>
+          </div>
+          <div class="category-snapshot" aria-label="Category snapshot">
+            <button type="button" data-category="News"><strong id="contextNews">0</strong><span>News</span></button>
+            <button type="button" data-category="AI Products"><strong id="contextProducts">0</strong><span>Products</span></button>
+            <button type="button" data-category="Jobs"><strong id="contextJobs">0</strong><span>Jobs</span></button>
+            <button type="button" data-category="Research"><strong id="contextResearch">0</strong><span>Research</span></button>
+          </div>
+          <span class="hidden-count" id="contextUpdates">0</span>
+          <span class="hidden-count" id="contextPrompts">0</span>
+          <span class="hidden-count" id="contextImagePrompts">0</span>
+          <div class="context-footer">
+            <span>Remotive &middot; Hacker News &middot; OpenAlex</span>
+            <strong id="contextLastSync">Waiting</strong>
+          </div>
+        </aside>
+      </section>
+
+      <section class="paid-beta-band" aria-label="Paid beta offer">
+        <div class="digest-preview" aria-label="Preview of the Pro AI Opportunity Digest">
+          <div class="digest-window-bar">
+            <span></span><span></span><span></span>
+            <strong>AI SignalDesk / Morning Brief</strong>
+          </div>
+          <div id="digestPreviewBody" class="digest-preview-body">
+            <div class="digest-preview-header">
+              <span>07:00 daily brief</span>
+              <strong>Your top AI signals, ranked.</strong>
+            </div>
+            <article>
+              <span class="digest-rank">01</span>
+              <div><small>Jobs</small><strong>Best-fit opportunity</strong><i>Why it matters + next action</i></div>
+              <b>92</b>
+            </article>
+            <article>
+              <span class="digest-rank">02</span>
+              <div><small>Research</small><strong>Paper worth tracking</strong><i>Method + application signal</i></div>
+              <b>87</b>
+            </article>
+            <article>
+              <span class="digest-rank">03</span>
+              <div><small>AI Products</small><strong>Launch with momentum</strong><i>Market context + source</i></div>
+              <b>84</b>
+            </article>
+          </div>
+          <div id="digestEmptyState" class="product-state digest-empty-state" hidden>
+            <img
+              src="/assets/states/state-empty-digest.webp"
+              alt="A digest system waiting for source signals"
+              width="800"
+              height="600"
+              loading="lazy"
+            />
+            <strong>Your first brief is waiting for signals</strong>
+            <span>The preview will populate after the feed receives its first items.</span>
+          </div>
+        </div>
+        <div class="beta-offer">
+          <p class="eyebrow">Paid beta</p>
+          <h2>The opportunity digest built around your goals.</h2>
+          <p>
+            Personalized highlights, source-backed summaries, and ready-to-use briefs for research,
+            jobs, LinkedIn, newsletters, and client work.
+          </p>
+          <div class="beta-price"><strong>$9</strong><span>/ month beta target</span></div>
+          <ul>
+            <li>Priority-ranked morning email</li>
+            <li>Personalized categories and actions</li>
+            <li>Full searchable signal archive</li>
+          </ul>
+          <button id="paidBetaButton" type="button">Join paid beta waitlist</button>
+          <small>No payment today. Register interest first.</small>
+        </div>
+      </section>
+
+      <section class="intelligence-mix" id="intelligenceMix" aria-label="Today's Intelligence Mix">
+        <div class="mix-copy">
+          <p class="eyebrow">Today&apos;s Intelligence Mix</p>
+          <h2>From market signal to business-ready output.</h2>
+          <p>Choose an intelligence lane, or turn today&apos;s strongest developments into a useful deliverable.</p>
+        </div>
+        <div class="mix-grid">
+          <button class="mix-card" type="button" data-category="Jobs">
+            <span>Jobs</span>
+            <strong id="mixJobs">0</strong>
+            <em>Roles and hiring signals</em>
+          </button>
+          <button class="mix-card" type="button" data-category="Research">
+            <span>Research</span>
+            <strong id="mixResearch">0</strong>
+            <em>Papers and lab signals</em>
+          </button>
+          <button class="mix-card" type="button" data-category="AI Products">
+            <span>AI Products</span>
+            <strong id="mixProducts">0</strong>
+            <em>Launches and tools</em>
+          </button>
+          <button class="mix-card" type="button" data-category="Prompts">
+            <span>Prompts</span>
+            <strong id="mixPrompts">0</strong>
+            <em>Prompt trends</em>
+          </button>
+          <button class="mix-card" type="button" data-category="Image Prompts">
+            <span>Image Prompts</span>
+            <strong id="mixImagePrompts">0</strong>
+            <em>Visual marketing ideas</em>
+          </button>
+        </div>
+        <div class="output-modes" aria-label="Marketable output modes">
+          <button class="output-mode-button" type="button" data-mode="LinkedIn Post">LinkedIn Post</button>
+          <button class="output-mode-button" type="button" data-mode="Newsletter Brief">Newsletter Brief</button>
+          <button class="output-mode-button" type="button" data-mode="Client Report">Client Report</button>
+          <button class="output-mode-button" type="button" data-mode="Prompt Pack">Prompt Pack</button>
+          <button class="output-mode-button" type="button" data-mode="Image Creative Brief">Image Creative Brief</button>
+          <button class="output-mode-button" type="button" data-mode="Research Digest">Research Digest</button>
+        </div>
+      </section>
+
+      <section class="news-ticker" aria-label="Live news ticker">
+        <span>Live signals</span>
+        <div class="ticker-track">
+          <p id="tickerText">AI jobs, papers, grants, tools, and funding signals refresh every day at 7:00 AM.</p>
+        </div>
+      </section>
+
+      <section id="syncState" class="system-state-banner" aria-live="polite" hidden>
+        <img
+          src="/assets/states/state-sync-error.webp"
+          alt="A signal dashboard with an interrupted data connection"
+          width="800"
+          height="600"
+          loading="lazy"
+        />
+        <div>
+          <strong>Live sources are temporarily unavailable</strong>
+          <p id="syncStateMessage">Showing the latest available intelligence while the connection recovers.</p>
+        </div>
+      </section>
+
+      <section class="value-strip" aria-label="Why viewers return">
+        <article>
+          <strong>For AI job seekers</strong>
+          <span>Remote AI roles, research engineer openings, internships, and application-ready summaries.</span>
+        </article>
+        <article>
+          <strong>For researchers</strong>
+          <span>Fresh AI papers, methods, lab signals, and research ideas without scanning raw feeds.</span>
+        </article>
+        <article>
+          <strong>For builders</strong>
+          <span>Agent tools, startup signals, funding movement, and workflow opportunities early.</span>
+        </article>
+      </section>
+
+      <section class="conversion-band" id="howItWorks">
+        <div>
+          <p class="eyebrow">Why people come back</p>
+          <h2>A daily brief that removes noise before it reaches you.</h2>
+        </div>
+        <div class="conversion-grid">
+          <article>
+            <span>01</span>
+            <h3>Live sources</h3>
+            <p>n8n collects real jobs, papers, and startup/tool signals from public sources.</p>
+          </article>
+          <article>
+            <span>02</span>
+            <h3>Relevance scoring</h3>
+            <p>Every item gets categorized, tagged, and ranked so users see the best items first.</p>
+          </article>
+          <article>
+            <span>03</span>
+            <h3>Action brief</h3>
+            <p>Each post explains why it matters and what the viewer should do next.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Feed metrics">
+        <article>
+          <span>Total posts</span>
+          <strong id="totalAlerts">0</strong>
+        </article>
+        <article>
+          <span>Today</span>
+          <strong id="todayAlerts">0</strong>
+        </article>
+        <article>
+          <span>High priority</span>
+          <strong id="highFitAlerts">0</strong>
+        </article>
+        <article>
+          <span>Last update</span>
+          <strong id="lastUpdate">-</strong>
+        </article>
+      </section>
+
+      <section class="category-strip" aria-label="Quick category filters">
+        <button class="category-button active" type="button" data-category="all">All</button>
+        <button class="category-button" type="button" data-category="News">News</button>
+        <button class="category-button" type="button" data-category="Updates">Updates</button>
+        <button class="category-button" type="button" data-category="AI Products">AI Products</button>
+        <button class="category-button" type="button" data-category="Prompts">Prompts</button>
+        <button class="category-button" type="button" data-category="Image Prompts">Image Prompts</button>
+        <button class="category-button" type="button" data-category="Jobs">Jobs</button>
+        <button class="category-button" type="button" data-category="Research">Research</button>
+        <button class="category-button" type="button" data-category="Startup News">Startup News</button>
+      </section>
+
+      <section class="spotlight-shell" aria-label="Latest daily post">
+        <div class="section-heading">
+          <h2>Latest Dispatch</h2>
+          <p id="spotlightDate">Waiting for n8n</p>
+        </div>
+        <div id="spotlightPost" class="spotlight-post"></div>
+      </section>
+
+      <section class="toolbar" aria-label="Feed controls">
+        <div class="search-box">
+          <span aria-hidden="true">Search</span>
+          <input id="searchInput" type="search" placeholder="Search news, jobs, papers, startups, keywords" />
+        </div>
+        <select id="categoryFilter" aria-label="Category filter">
+          <option value="all">All categories</option>
+        </select>
+        <select id="fitFilter" aria-label="Priority filter">
+          <option value="all">All priority</option>
+          <option value="80">80+ priority</option>
+          <option value="60">60+ priority</option>
+        </select>
+        <button id="refreshButton" type="button" title="Refresh feed">Refresh</button>
+      </section>
+
+      <section class="feed-shell" id="dailyFeed">
+        <div class="section-heading">
+          <h2>Archive</h2>
+          <p id="resultCount">0 results</p>
+        </div>
+        <div id="alertFeed" class="alert-feed" aria-live="polite"></div>
+      </section>
+
+      <section class="assistant-console" id="aiChat">
+        <div class="assistant-info">
+          <p class="eyebrow">AI assistant</p>
+          <h2>Ask the desk about today&apos;s opportunities.</h2>
+          <p>
+            The chatbot reads the current local feed and helps compare jobs, papers, startup signals,
+            fit scores, source links, and next actions.
+          </p>
+        </div>
+        <div class="chat-panel">
+          <div class="chat-toolbar" aria-label="Chat actions">
+            <span>Opportunity copilot</span>
+            <button id="exportChatButton" type="button">Export HTML</button>
+          </div>
+          <div id="chatSetupState" class="product-state chat-setup-state" hidden>
+            <img
+              src="/assets/states/state-chat-setup.webp"
+              alt="An AI briefing workspace waiting for setup"
+              width="800"
+              height="600"
+              loading="lazy"
+            />
+            <div>
+              <strong>Copilot setup required</strong>
+              <span>Configure the AI provider, then retry your question.</span>
+            </div>
+          </div>
+          <div id="chatMessages" class="chat-messages" aria-live="polite"></div>
+          <div id="chatSuggestions" class="chat-suggestions" aria-label="Suggested follow-up prompts"></div>
+          <div class="prompt-queue" aria-label="Prompt queue">
+            <div class="queue-header">
+              <span>Prompt queue</span>
+              <button id="clearQueueButton" type="button">Clear</button>
+            </div>
+            <div id="promptQueueList" class="queue-list"></div>
+          </div>
+          <form id="chatForm" class="chat-form">
+            <input
+              id="chatInput"
+              type="text"
+              placeholder="Ask which opportunity fits healthcare AI, research, jobs..."
+              autocomplete="off"
+            />
+            <button id="chatSendButton" type="submit">Send</button>
+          </form>
+          <p id="chatStatus" class="form-status" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="signup-section" id="joinPreview">
+        <div>
+          <p class="eyebrow">Daily formatted email</p>
+          <h2>Subscribe to the daily AI opportunity email.</h2>
+          <p>
+            Get one formatted morning brief with the best jobs, research papers, AI products,
+            prompts, and visual marketing ideas. Your interests decide what gets highlighted first.
+          </p>
+          <div class="pricing-note">
+            <strong>Email format</strong>
+            <span>Clean HTML digest with category sections, priority scores, source links, and next actions.</span>
+          </div>
+        </div>
+        <form id="leadForm" class="lead-form">
+          <label>
+            Name
+            <input id="leadName" name="name" type="text" placeholder="Your name" />
+          </label>
+          <label>
+            Email
+            <input id="leadEmail" name="email" type="email" placeholder="you@example.com" required />
+          </label>
+          <label>
+            Role
+            <select id="leadRole" name="role">
+              <option value="AI researcher">AI researcher</option>
+              <option value="Student">Student</option>
+              <option value="Job seeker">Job seeker</option>
+              <option value="Founder">Founder</option>
+              <option value="Agency">Agency</option>
+            </select>
+          </label>
+          <fieldset>
+            <legend>Interests</legend>
+            <label><input type="checkbox" name="interests" value="AI Jobs" checked /> AI Jobs</label>
+            <label><input type="checkbox" name="interests" value="Research Papers" checked /> Research Papers</label>
+            <label><input type="checkbox" name="interests" value="AI Products" checked /> AI Products</label>
+            <label><input type="checkbox" name="interests" value="Prompts" checked /> Prompts</label>
+            <label><input type="checkbox" name="interests" value="Image Prompts" checked /> Image Prompts</label>
+            <label><input type="checkbox" name="interests" value="AI Tools" /> AI Tools</label>
+            <label><input id="paidBetaInterest" type="checkbox" name="interests" value="Paid Beta" /> Paid Beta</label>
+          </fieldset>
+          <label>
+            Delivery
+            <select id="leadChannel" name="channel">
+              <option value="email">Email</option>
+              <option value="telegram">Telegram</option>
+              <option value="whatsapp">WhatsApp</option>
+            </select>
+          </label>
+          <input type="hidden" name="frequency" value="daily" />
+          <input type="hidden" name="digestFormat" value="html" />
+          <button type="submit">Subscribe to Daily Email</button>
+          <a class="digest-preview-link" href="/api/digest/daily.html" target="_blank" rel="noreferrer">Preview formatted email</a>
+          <p id="leadStatus" class="form-status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+
+    <template id="emptyTemplate">
+      <div class="empty-state">
+        <img
+          src="/assets/states/state-no-results.webp"
+          alt="A signal scanner beside empty result trays"
+          width="800"
+          height="600"
+          loading="lazy"
+        />
+        <h2>No posts yet</h2>
+        <p>When the n8n workflow posts to <code>/api/posts/daily</code>, the daily article will appear here.</p>
+      </div>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

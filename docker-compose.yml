@@ -1,0 +1,55 @@
+name: ai-signaldesk
+
+services:
+  web:
+    build:
+      context: .
+    image: ai-signaldesk:latest
+    container_name: ai-signaldesk-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4173
+      WEBHOOK_TOKEN: ${WEBHOOK_TOKEN:?Set WEBHOOK_TOKEN in .env}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-qwen/qwen3.7-flash}
+      OPENROUTER_SITE_URL: ${AI_SIGNALDESK_PUBLIC_URL:-http://localhost:4173}
+      OPENROUTER_SITE_NAME: AI SignalDesk
+      N8N_LIVE_WEBHOOK_URL: ${N8N_LIVE_WEBHOOK_URL:-}
+      N8N_LIVE_WEBHOOK_TOKEN: ${N8N_LIVE_WEBHOOK_TOKEN:-}
+    ports:
+      - "${WEB_PORT:-4173}:4173"
+    volumes:
+      - ./data:/app/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "node -e \"fetch('http://127.0.0.1:4173/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      com.ai-signaldesk.display-name: "AI SignalDesk"
+
+  mcp:
+    image: ai-signaldesk:latest
+    container_name: ai-signaldesk-mcp
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    command: ["node", "mcp-server.mjs", "--http"]
+    environment:
+      NODE_ENV: production
+      PORT: 4173
+      MCP_PORT: 4174
+      MCP_TOKEN: ${MCP_TOKEN:?Set MCP_TOKEN in .env}
+      WEBHOOK_TOKEN: ${WEBHOOK_TOKEN:?Set WEBHOOK_TOKEN in .env}
+      AI_SIGNALDESK_PUBLIC_URL: ${AI_SIGNALDESK_PUBLIC_URL:-http://localhost:4173}
+    ports:
+      - "${MCP_PORT:-4174}:4174"
+    volumes:
+      - ./data:/app/data:ro
+    labels:
+      com.ai-signaldesk.display-name: "AI SignalDesk MCP"

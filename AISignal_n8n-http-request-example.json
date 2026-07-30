@@ -1,0 +1,20 @@
+{
+  "method": "POST",
+  "url": "http://localhost:4173/api/posts/daily",
+  "sendBody": true,
+  "contentType": "json",
+  "jsonBody": {
+    "id": "={{ $json.id || $json.slug || $json.link || $json.title }}",
+    "title": "={{ $json.title || $json.headline || $json.jobTitle }}",
+    "publisher": "={{ $json.publisher || $json.company || $json.organization || $json.source || 'Curated by n8n' }}",
+    "location": "={{ $json.location || $json.region || 'Global' }}",
+    "category": "={{ $json.category || $json.type || 'News' }}",
+    "fitScore": "={{ $json.fitScore || $json.priority || $json.score || 0 }}",
+    "publishedAt": "={{ $json.publishedAt || $json.date || $now }}",
+    "summary": "={{ $json.summary || $json.description || $json.snippet }}",
+    "content": "={{ $json.content || $json.body || $json.article || $json.summary || $json.description }}",
+    "tags": "={{ $json.tags || $json.keywords || [] }}",
+    "imageUrl": "={{ $json.imageUrl || $json.image || $json.thumbnail }}",
+    "link": "={{ $json.link || $json.url || $json.applyUrl || $json.sourceUrl }}"
+  }
+}

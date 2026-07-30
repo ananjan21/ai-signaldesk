@@ -1,8 +1,9 @@
-const TOKEN_KEY = "aiSignalDeskAdminToken";
+const AUTH_KEY = "aiSignalDeskAdminAuth";
 const loginPanel = document.querySelector("#loginPanel");
 const dashboardPanel = document.querySelector("#dashboardPanel");
 const loginForm = document.querySelector("#adminLoginForm");
-const tokenInput = document.querySelector("#adminToken");
+const usernameInput = document.querySelector("#adminUsername");
+const passwordInput = document.querySelector("#adminPassword");
 const loginStatus = document.querySelector("#loginStatus");
 const adminStatus = document.querySelector("#adminStatus");
 const rows = document.querySelector("#subscriberRows");
@@ -10,10 +11,10 @@ const searchInput = document.querySelector("#subscriberSearch");
 const statusFilter = document.querySelector("#subscriberStatus");
 const csvDownload = document.querySelector("#csvDownload");
 
-let state = { token: sessionStorage.getItem(TOKEN_KEY) || "", leads: [], summary: null };
+let state = { auth: sessionStorage.getItem(AUTH_KEY) || "", leads: [], summary: null };
 
 function authHeaders() {
-  return { Authorization: `Bearer ${state.token}` };
+  return { Authorization: `Basic ${state.auth}` };
 }
 
 function escapeHtml(value = "") {
@@ -91,7 +92,7 @@ function renderRows() {
 async function loadSummary() {
   adminStatus.textContent = "Loading...";
   const response = await fetch("/api/admin/summary", { headers: authHeaders() });
-  if (!response.ok) throw new Error(response.status === 401 ? "Invalid admin token." : "Could not load admin data.");
+  if (!response.ok) throw new Error(response.status === 401 ? "Invalid admin login." : "Could not load admin data.");
   const data = await response.json();
   state.summary = data;
   state.leads = data.leads || [];
@@ -130,9 +131,9 @@ async function recordForward(id) {
   await loadSummary();
 }
 
-async function openDashboard(token) {
-  state.token = token;
-  sessionStorage.setItem(TOKEN_KEY, token);
+async function openDashboard(username, password, existingAuth = "") {
+  state.auth = existingAuth || btoa(`${username}:${password}`);
+  sessionStorage.setItem(AUTH_KEY, state.auth);
   loginPanel.hidden = true;
   dashboardPanel.hidden = false;
   await loadSummary();
@@ -140,12 +141,13 @@ async function openDashboard(token) {
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  loginStatus.textContent = "Checking token...";
+  loginStatus.textContent = "Checking login...";
   try {
-    await openDashboard(tokenInput.value.trim());
+    await openDashboard(usernameInput.value.trim(), passwordInput.value);
+    passwordInput.value = "";
     loginStatus.textContent = "";
   } catch (error) {
-    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(AUTH_KEY);
     loginPanel.hidden = false;
     dashboardPanel.hidden = true;
     loginStatus.textContent = error.message;
@@ -155,8 +157,8 @@ loginForm.addEventListener("submit", async (event) => {
 document.querySelector("#refreshAdmin").addEventListener("click", () => loadSummary().catch((error) => (adminStatus.textContent = error.message)));
 csvDownload.addEventListener("click", (event) => downloadCsv(event).catch((error) => (adminStatus.textContent = error.message)));
 document.querySelector("#logoutAdmin").addEventListener("click", () => {
-  sessionStorage.removeItem(TOKEN_KEY);
-  state = { token: "", leads: [], summary: null };
+  sessionStorage.removeItem(AUTH_KEY);
+  state = { auth: "", leads: [], summary: null };
   loginPanel.hidden = false;
   dashboardPanel.hidden = true;
 });
@@ -167,9 +169,9 @@ rows.addEventListener("click", (event) => {
   if (id) recordForward(id).catch((error) => (adminStatus.textContent = error.message));
 });
 
-if (state.token) {
-  openDashboard(state.token).catch(() => {
-    sessionStorage.removeItem(TOKEN_KEY);
+if (state.auth) {
+  openDashboard("", "", state.auth).catch(() => {
+    sessionStorage.removeItem(AUTH_KEY);
     loginPanel.hidden = false;
     dashboardPanel.hidden = true;
   });

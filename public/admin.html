@@ -12,11 +12,15 @@
       <section class="admin-login" id="loginPanel">
         <p class="eyebrow">Private admin</p>
         <h1>AI SignalDesk subscriber panel</h1>
-        <p>Sign in with the server admin token to view subscribers, dates, interests, and email delivery tracking.</p>
+        <p>Sign in with your admin username and password to view subscribers, dates, interests, and email delivery tracking.</p>
         <form id="adminLoginForm" class="admin-login-form">
           <label>
-            Admin token
-            <input id="adminToken" type="password" autocomplete="current-password" placeholder="Paste WEBHOOK_TOKEN" required />
+            Username
+            <input id="adminUsername" type="text" autocomplete="username" placeholder="admin" required />
+          </label>
+          <label>
+            Password
+            <input id="adminPassword" type="password" autocomplete="current-password" placeholder="Password" required />
           </label>
           <button type="submit">Open admin panel</button>
         </form>

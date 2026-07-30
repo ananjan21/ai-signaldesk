@@ -191,7 +191,7 @@ Open the private admin page at:
 /admin
 ```
 
-Sign in with `WEBHOOK_TOKEN`. The panel shows subscriber emails, roles, interests, signup/update dates, active status, and email delivery counters. After an email workflow sends or forwards a digest, record that event with:
+Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in the server environment, then sign in with those credentials. The panel shows subscriber emails, roles, interests, signup/update dates, active status, and email delivery counters. After an email workflow sends or forwards a digest, record that event with admin Basic auth or `WEBHOOK_TOKEN` bearer auth:
 
 ```text
 POST /api/admin/email-forward

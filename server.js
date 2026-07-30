@@ -12,6 +12,8 @@ const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "google/gemini-3.5-flash-lite";
 const OPENROUTER_SITE_URL = process.env.OPENROUTER_SITE_URL || `http://localhost:${PORT}`;
 const OPENROUTER_SITE_NAME = process.env.OPENROUTER_SITE_NAME || "AI SignalDesk";
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
 const DATA_DIR = path.join(ROOT, "data");
@@ -76,6 +78,38 @@ function isAuthorized(req) {
   if (!WEBHOOK_TOKEN) return false;
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, "") || req.headers["x-webhook-token"];
   return token === WEBHOOK_TOKEN;
+}
+
+function basicAdminCredentials(req) {
+  const header = String(req.headers.authorization || "");
+  if (!header.toLowerCase().startsWith("basic ")) return null;
+  try {
+    const decoded = Buffer.from(header.slice(6), "base64").toString("utf8");
+    const separator = decoded.indexOf(":");
+    if (separator === -1) return null;
+    return {
+      username: decoded.slice(0, separator),
+      password: decoded.slice(separator + 1),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isAdminAuthorized(req) {
+  if (!ADMIN_USERNAME || !ADMIN_PASSWORD) return false;
+  const credentials = basicAdminCredentials(req);
+  return credentials?.username === ADMIN_USERNAME && credentials?.password === ADMIN_PASSWORD;
+}
+
+function requireAdminAuth(req, res) {
+  if (isAdminAuthorized(req) || isAuthorized(req)) return { ok: true, handled: false };
+  res.setHeader("WWW-Authenticate", 'Basic realm="AI SignalDesk Admin"');
+  return {
+    ok: false,
+    handled: true,
+    response: json(res, 401, { ok: false, error: "Unauthorized" }),
+  };
 }
 
 function requireWebhookToken(req, res) {
@@ -1131,14 +1165,14 @@ function adminSummary({ leads, analytics, items }) {
 }
 
 async function handleAdminSummary(req, res) {
-  const auth = requireWebhookToken(req, res);
+  const auth = requireAdminAuth(req, res);
   if (!auth.ok) return auth.response;
   const [items, leads, analytics] = await Promise.all([readItems(), readLeads(), readAnalytics()]);
   return json(res, 200, adminSummary({ items, leads, analytics }));
 }
 
 async function handleEmailForward(req, res) {
-  const auth = requireWebhookToken(req, res);
+  const auth = requireAdminAuth(req, res);
   if (!auth.ok) return auth.response;
   const body = await readBody(req);
   const email = cleanText(body.email || "", 254).toLowerCase();
@@ -1253,7 +1287,7 @@ async function handleApi(req, res, url) {
   }
 
   if (url.pathname === "/api/leads.csv" && req.method === "GET") {
-    const auth = requireWebhookToken(req, res);
+    const auth = requireAdminAuth(req, res);
     if (!auth.ok) return auth.response;
     const csv = leadsToCsv(await readLeads());
     return send(res, 200, csv, {

@@ -1726,6 +1726,14 @@ body {
   font-weight: 750;
 }
 
+.brand-lockup .creator-credit,
+.creator-credit {
+  margin-top: 2px;
+  color: var(--teal);
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+
 .topnav {
   gap: 4px;
 }

@@ -284,6 +284,25 @@ function firstValue(source, keys, fallback = "") {
 
 function cleanText(value, maxLength = 4000) {
   return String(value ?? "")
+    .replace(/<\s*(br|\/p|\/div|\/li|\/h[1-6])\s*\/?>/gi, "\n")
+    .replace(/<\s*li\b[^>]*>/gi, "- ")
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&#(\d+);/g, (_match, code) => {
+      const value = Number(code);
+      return Number.isFinite(value) ? String.fromCodePoint(value) : " ";
+    })
+    .replace(/&#x([0-9a-f]+);/gi, (_match, code) => {
+      const value = Number.parseInt(code, 16);
+      return Number.isFinite(value) ? String.fromCodePoint(value) : " ";
+    })
     .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, " ")
     .replace(/[ \t]+/g, " ")
     .replace(/\n{3,}/g, "\n\n")
@@ -519,9 +538,16 @@ function sanitizeStoredItem(item) {
   const publishedAt = normalizePublishedAt(item.publishedAt, warnings);
   return {
     ...item,
+    title: cleanText(item.title, 180),
+    company: cleanText(item.company, 140),
+    link: cleanText(item.link, 900),
+    summary: cleanText(item.summary, 1200),
+    content: cleanText(item.content, 12000),
+    location: cleanText(item.location || "Remote / Global", 140),
+    imageUrl: cleanText(item.imageUrl, 900),
     category: canonicalCategory(item.category),
     fitScore: Math.max(0, Math.min(100, Number(item.fitScore || 0))),
-    tags: normalizeArray(item.tags).slice(0, 12),
+    tags: normalizeArray(item.tags).slice(0, 12).map((tag) => cleanText(tag, 40)),
     publishedAt,
     ...(warnings.length ? { dataQualityWarnings: [...new Set(warnings)] } : {}),
   };
@@ -1189,6 +1215,7 @@ function renderPostPage(item) {
       <div>
         <p class="eyebrow">Daily published post</p>
         <h1>${escapeHtml(item.title)}</h1>
+        <p class="creator-credit">Created by Dr. Ananjan Maiti</p>
       </div>
       <a class="nav-button" href="/">All posts</a>
     </header>

@@ -56,9 +56,22 @@ function filteredLeads() {
   const query = searchInput.value.trim().toLowerCase();
   const status = statusFilter.value;
   return state.leads.filter((lead) => {
-    const statusOk = status === "all" || (status === "active" ? lead.subscribed : !lead.subscribed);
+    const statusOk =
+      status === "all" ||
+      (status === "active" && lead.subscribed) ||
+      (status === "inactive" && !lead.subscribed) ||
+      (status === "paid-beta" && lead.plan === "paid-beta") ||
+      (status === "paid-access" && lead.paidAccessEnabled) ||
+      (status === "missing-paid-password" && lead.plan === "paid-beta" && !lead.paidPasswordSet);
     return statusOk && textMatch(lead, query);
   });
+}
+
+function paidAccessLabel(lead) {
+  if (lead.plan !== "paid-beta") return "Not paid beta";
+  if (!lead.paidAccessEnabled) return "Paid beta / access off";
+  if (!lead.paidPasswordSet) return "Paid beta / password needed";
+  return "Paid beta / login ready";
 }
 
 function renderMetrics() {
@@ -74,7 +87,7 @@ function renderRows() {
   rows.replaceChildren();
   if (!leads.length) {
     const row = document.createElement("tr");
-    row.innerHTML = `<td colspan="6" class="admin-empty">No subscribers match this view.</td>`;
+    row.innerHTML = `<td colspan="7" class="admin-empty">No subscribers match this view.</td>`;
     rows.append(row);
     return;
   }
@@ -91,7 +104,7 @@ function renderRows() {
       <td>
         <strong>${escapeHtml(lead.email || "-")}</strong>
         <small>${lead.subscribed ? "Subscribed" : "Inactive"}${lead.bounced ? " / Bounced" : ""}</small>
-        <small>${escapeHtml(lead.plan || "free-preview")}${lead.paidAccessEnabled ? " / access on" : ""}</small>
+        <small>${escapeHtml(paidAccessLabel(lead))}</small>
         <small>${lead.paidPasswordSet ? `Password set ${formatDate(lead.paidPasswordUpdatedAt)}` : "No paid password"}</small>
       </td>
       <td>
@@ -126,8 +139,12 @@ function renderRows() {
         <label>Interests<input data-field="interests" data-id="${escapeHtml(lead.id)}" value="${escapeHtml((lead.interests || []).join(", "))}" /></label>
         <label>Tags<input data-field="adminTags" data-id="${escapeHtml(lead.id)}" value="${escapeHtml((lead.adminTags || []).join(", "))}" /></label>
         <label>Notes<textarea data-field="adminNotes" data-id="${escapeHtml(lead.id)}">${escapeHtml(lead.adminNotes || "")}</textarea></label>
-        <label>Paid username<input data-field="paidUsername" data-id="${escapeHtml(lead.id)}" value="${escapeHtml(lead.paidUsername || suggestedUsername(lead))}" /></label>
-        <label>New temp password<input data-field="paidPassword" data-id="${escapeHtml(lead.id)}" value="" placeholder="Set or reset password" /></label>
+        <div class="admin-paid-editor">
+          <strong>Paid beta login</strong>
+          <small>${escapeHtml(paidAccessLabel(lead))}</small>
+          <label>Paid username<input data-field="paidUsername" data-id="${escapeHtml(lead.id)}" value="${escapeHtml(lead.paidUsername || suggestedUsername(lead))}" autocomplete="off" /></label>
+          <label>New password<input data-field="paidPassword" data-id="${escapeHtml(lead.id)}" type="text" value="" placeholder="Type or generate password" autocomplete="off" /></label>
+        </div>
         <div class="admin-tags">${adminTags}</div>
         <div class="admin-button-grid">
           <button type="button" data-toggle-subscribe="${escapeHtml(lead.id)}">${lead.subscribed ? "Unsubscribe" : "Resubscribe"}</button>
@@ -135,7 +152,8 @@ function renderRows() {
           <button type="button" data-toggle-paid="${escapeHtml(lead.id)}">${lead.plan === "paid-beta" ? "Mark free" : "Mark paid beta"}</button>
           <button type="button" data-toggle-paid-access="${escapeHtml(lead.id)}">${lead.paidAccessEnabled ? "Disable access" : "Enable access"}</button>
           <button type="button" data-generate-password="${escapeHtml(lead.id)}">Generate password</button>
-          <button type="button" data-save="${escapeHtml(lead.id)}">Save edits</button>
+          <button type="button" class="save" data-save-paid-login="${escapeHtml(lead.id)}">Save paid login</button>
+          <button type="button" class="save" data-save="${escapeHtml(lead.id)}">Save edits</button>
           <button type="button" class="danger" data-delete="${escapeHtml(lead.id)}">Delete</button>
         </div>
       </td>
@@ -220,7 +238,7 @@ async function updateSubscriber(id, patch) {
 }
 
 async function saveSubscriberEdits(id) {
-  await updateSubscriber(id, {
+  const patch = {
     name: fieldValue(id, "name"),
     role: fieldValue(id, "role"),
     channel: fieldValue(id, "channel"),
@@ -229,8 +247,31 @@ async function saveSubscriberEdits(id) {
     adminTags: fieldValue(id, "adminTags"),
     adminNotes: fieldValue(id, "adminNotes"),
     paidUsername: fieldValue(id, "paidUsername"),
-    paidPassword: fieldValue(id, "paidPassword"),
+  };
+  const paidPassword = fieldValue(id, "paidPassword").trim();
+  if (paidPassword) {
+    patch.paidPassword = paidPassword;
+    patch.plan = "paid-beta";
+    patch.paidAccessEnabled = true;
+  }
+  await updateSubscriber(id, patch);
+}
+
+async function savePaidLogin(id) {
+  const paidPassword = fieldValue(id, "paidPassword").trim();
+  if (!paidPassword) {
+    adminStatus.textContent = "Enter or generate a paid beta password first.";
+    document.querySelector(`[data-id="${CSS.escape(id)}"][data-field="paidPassword"]`)?.focus();
+    return;
+  }
+  const paidUsername = fieldValue(id, "paidUsername") || suggestedUsername(leadById(id) || {});
+  await updateSubscriber(id, {
+    plan: "paid-beta",
+    paidAccessEnabled: true,
+    paidUsername,
+    paidPassword,
   });
+  adminStatus.textContent = `Paid beta login saved. Username: ${paidUsername} / Temporary password: ${paidPassword}`;
 }
 
 async function deleteSubscriber(id) {
@@ -287,6 +328,7 @@ rows.addEventListener("click", (event) => {
     target?.dataset?.togglePaid ||
     target?.dataset?.togglePaidAccess ||
     target?.dataset?.generatePassword ||
+    target?.dataset?.savePaidLogin ||
     target?.dataset?.save ||
     target?.dataset?.delete;
   const forward = target?.dataset?.forward;
@@ -312,9 +354,10 @@ rows.addEventListener("click", (event) => {
     if (input) {
       input.value = generatedPassword();
       input.focus();
-      adminStatus.textContent = "Temporary password generated. Click Save edits to store it.";
+      adminStatus.textContent = "Temporary password generated. Click Save paid login to store it.";
     }
   }
+  if (target?.dataset?.savePaidLogin) savePaidLogin(lead).catch((error) => (adminStatus.textContent = error.message));
   if (target?.dataset?.save) saveSubscriberEdits(lead).catch((error) => (adminStatus.textContent = error.message));
   if (target?.dataset?.delete) deleteSubscriber(lead).catch((error) => (adminStatus.textContent = error.message));
 });

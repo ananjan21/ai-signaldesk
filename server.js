@@ -757,6 +757,11 @@ async function handleLeadSignup(req, res) {
       ? {
           ...existing,
           ...lead,
+          plan: existing.plan || lead.plan,
+          paidAccessEnabled: existing.paidAccessEnabled === true || lead.paidAccessEnabled === true,
+          paidUsername: existing.paidUsername || lead.paidUsername,
+          paidPasswordHash: existing.paidPasswordHash || lead.paidPasswordHash,
+          paidPasswordUpdatedAt: existing.paidPasswordUpdatedAt || lead.paidPasswordUpdatedAt,
           emailForwardCount: existing.emailForwardCount || 0,
           lastEmailForwardedAt: existing.lastEmailForwardedAt || null,
           lastEmailSubject: existing.lastEmailSubject || "",
@@ -1248,7 +1253,10 @@ async function handleEmailForward(req, res) {
   if (index === -1) return json(res, 404, { ok: false, error: "Subscriber not found." });
 
   const now = new Date().toISOString();
-  const lead = sanitizeLead(leads[index]);
+  const lead = {
+    ...sanitizeLead(leads[index]),
+    paidPasswordHash: cleanText(leads[index].paidPasswordHash || "", 240),
+  };
   leads[index] = {
     ...lead,
     emailForwardCount: Number(lead.emailForwardCount || 0) + increment,
@@ -1256,7 +1264,7 @@ async function handleEmailForward(req, res) {
     lastEmailSubject: subject,
     updatedAt: now,
   };
-  await writeLeads(leads.map(sanitizeLead).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+  await writeLeads(leads.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
   await appendAnalytics({
     id: crypto.randomUUID(),
     type: "email_forward_recorded",
@@ -1313,7 +1321,7 @@ async function handleAdminSubscriberUpdate(req, res) {
   if (next.plan === "paid") next.plan = "paid-beta";
   if (errors.length) return json(res, 400, { ok: false, error: errors[0], errors });
   leads[index] = next;
-  await writeLeads(leads.map(sanitizeLead).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+  await writeLeads(leads.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
   await appendAnalytics({
     id: crypto.randomUUID(),
     type: "admin_subscriber_updated",

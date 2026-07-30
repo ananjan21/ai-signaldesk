@@ -2132,6 +2132,26 @@ body {
   min-width: 280px;
 }
 
+.admin-paid-editor {
+  display: grid;
+  gap: 7px;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid rgba(0, 127, 115, 0.22);
+  border-radius: 8px;
+  background: #f3fbfb;
+}
+
+.admin-paid-editor strong {
+  color: var(--navy);
+  font-size: 0.8rem;
+}
+
+.admin-paid-editor small {
+  color: var(--teal-dark);
+  font-weight: 850;
+}
+
 .admin-button-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2143,7 +2163,7 @@ body {
   background: var(--navy);
 }
 
-.admin-button-grid button:nth-child(6) {
+.admin-button-grid .save {
   background: var(--teal);
 }
 

@@ -140,11 +140,11 @@ Set your OpenRouter key before starting the app:
 
 ```powershell
 $env:OPENROUTER_API_KEY="your-openrouter-key"
-$env:OPENROUTER_MODEL="qwen/qwen3.7-flash"
+$env:OPENROUTER_MODEL="google/gemini-3.5-flash-lite"
 npm start
 ```
 
-`OPENROUTER_MODEL` is optional. The default is `qwen/qwen3.7-flash` for low-cost feed-grounded chat. Other good low-cost options are `google/gemini-3.5-flash-lite` and `meituan/longcat-2.0`. The app uses OpenRouter's OpenAI-compatible chat completions endpoint.
+`OPENROUTER_MODEL` is optional. The default is `google/gemini-3.5-flash-lite` for low-cost feed-grounded chat. Other good low-cost options are `inclusionai/ling-3.0-flash:free` and `qwen/qwen3.7-flash` when provider capacity is available. The app uses OpenRouter's OpenAI-compatible chat completions endpoint.
 
 ## Daily Email Subscription
 

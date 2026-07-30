@@ -9,7 +9,7 @@ const N8N_LIVE_WEBHOOK_URL =
   process.env.N8N_LIVE_WEBHOOK_URL || "https://n8n.ailabworks.tech/webhook/ai-opportunity-real-data-pull-v2";
 const N8N_LIVE_WEBHOOK_TOKEN = process.env.N8N_LIVE_WEBHOOK_TOKEN || "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "qwen/qwen3.7-flash";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "google/gemini-3.5-flash-lite";
 const OPENROUTER_SITE_URL = process.env.OPENROUTER_SITE_URL || `http://localhost:${PORT}`;
 const OPENROUTER_SITE_NAME = process.env.OPENROUTER_SITE_NAME || "AI SignalDesk";
 const ROOT = __dirname;

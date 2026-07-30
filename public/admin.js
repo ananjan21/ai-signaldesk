@@ -43,6 +43,7 @@ function textMatch(lead, query) {
     lead.digestFormat,
     lead.plan,
     lead.adminNotes,
+    lead.paidUsername,
     ...(lead.interests || []),
     ...(lead.adminTags || []),
   ]
@@ -90,7 +91,8 @@ function renderRows() {
       <td>
         <strong>${escapeHtml(lead.email || "-")}</strong>
         <small>${lead.subscribed ? "Subscribed" : "Inactive"}${lead.bounced ? " / Bounced" : ""}</small>
-        <small>${escapeHtml(lead.plan || "free-preview")}</small>
+        <small>${escapeHtml(lead.plan || "free-preview")}${lead.paidAccessEnabled ? " / access on" : ""}</small>
+        <small>${lead.paidPasswordSet ? `Password set ${formatDate(lead.paidPasswordUpdatedAt)}` : "No paid password"}</small>
       </td>
       <td>
         <label>Name<input data-field="name" data-id="${escapeHtml(lead.id)}" value="${escapeHtml(lead.name || "")}" /></label>
@@ -124,11 +126,15 @@ function renderRows() {
         <label>Interests<input data-field="interests" data-id="${escapeHtml(lead.id)}" value="${escapeHtml((lead.interests || []).join(", "))}" /></label>
         <label>Tags<input data-field="adminTags" data-id="${escapeHtml(lead.id)}" value="${escapeHtml((lead.adminTags || []).join(", "))}" /></label>
         <label>Notes<textarea data-field="adminNotes" data-id="${escapeHtml(lead.id)}">${escapeHtml(lead.adminNotes || "")}</textarea></label>
+        <label>Paid username<input data-field="paidUsername" data-id="${escapeHtml(lead.id)}" value="${escapeHtml(lead.paidUsername || suggestedUsername(lead))}" /></label>
+        <label>New temp password<input data-field="paidPassword" data-id="${escapeHtml(lead.id)}" value="" placeholder="Set or reset password" /></label>
         <div class="admin-tags">${adminTags}</div>
         <div class="admin-button-grid">
           <button type="button" data-toggle-subscribe="${escapeHtml(lead.id)}">${lead.subscribed ? "Unsubscribe" : "Resubscribe"}</button>
           <button type="button" data-toggle-bounced="${escapeHtml(lead.id)}">${lead.bounced ? "Clear bounce" : "Mark bounced"}</button>
           <button type="button" data-toggle-paid="${escapeHtml(lead.id)}">${lead.plan === "paid-beta" ? "Mark free" : "Mark paid beta"}</button>
+          <button type="button" data-toggle-paid-access="${escapeHtml(lead.id)}">${lead.paidAccessEnabled ? "Disable access" : "Enable access"}</button>
+          <button type="button" data-generate-password="${escapeHtml(lead.id)}">Generate password</button>
           <button type="button" data-save="${escapeHtml(lead.id)}">Save edits</button>
           <button type="button" class="danger" data-delete="${escapeHtml(lead.id)}">Delete</button>
         </div>
@@ -188,6 +194,17 @@ function fieldValue(id, field) {
   return document.querySelector(`[data-id="${CSS.escape(id)}"][data-field="${field}"]`)?.value || "";
 }
 
+function suggestedUsername(lead) {
+  const local = String(lead.email || "member").split("@")[0].toLowerCase().replace(/[^a-z0-9]+/g, ".");
+  return `beta.${local || lead.id}`;
+}
+
+function generatedPassword() {
+  const bytes = new Uint8Array(9);
+  crypto.getRandomValues(bytes);
+  return `Beta-${Array.from(bytes, (byte) => byte.toString(36).padStart(2, "0")).join("").slice(0, 12)}`;
+}
+
 async function updateSubscriber(id, patch) {
   adminStatus.textContent = "Saving subscriber...";
   const response = await fetch("/api/admin/subscriber", {
@@ -211,6 +228,8 @@ async function saveSubscriberEdits(id) {
     interests: fieldValue(id, "interests"),
     adminTags: fieldValue(id, "adminTags"),
     adminNotes: fieldValue(id, "adminNotes"),
+    paidUsername: fieldValue(id, "paidUsername"),
+    paidPassword: fieldValue(id, "paidPassword"),
   });
 }
 
@@ -262,7 +281,14 @@ searchInput.addEventListener("input", renderRows);
 statusFilter.addEventListener("change", renderRows);
 rows.addEventListener("click", (event) => {
   const target = event.target;
-  const lead = target?.dataset?.toggleSubscribe || target?.dataset?.toggleBounced || target?.dataset?.togglePaid || target?.dataset?.save || target?.dataset?.delete;
+  const lead =
+    target?.dataset?.toggleSubscribe ||
+    target?.dataset?.toggleBounced ||
+    target?.dataset?.togglePaid ||
+    target?.dataset?.togglePaidAccess ||
+    target?.dataset?.generatePassword ||
+    target?.dataset?.save ||
+    target?.dataset?.delete;
   const forward = target?.dataset?.forward;
   if (forward) recordForward(forward).catch((error) => (adminStatus.textContent = error.message));
   if (target?.dataset?.toggleSubscribe) {
@@ -276,6 +302,18 @@ rows.addEventListener("click", (event) => {
   if (target?.dataset?.togglePaid) {
     const current = leadById(lead);
     updateSubscriber(lead, { plan: current.plan === "paid-beta" ? "free-preview" : "paid-beta" }).catch((error) => (adminStatus.textContent = error.message));
+  }
+  if (target?.dataset?.togglePaidAccess) {
+    const current = leadById(lead);
+    updateSubscriber(lead, { paidAccessEnabled: !current.paidAccessEnabled, plan: "paid-beta" }).catch((error) => (adminStatus.textContent = error.message));
+  }
+  if (target?.dataset?.generatePassword) {
+    const input = document.querySelector(`[data-id="${CSS.escape(lead)}"][data-field="paidPassword"]`);
+    if (input) {
+      input.value = generatedPassword();
+      input.focus();
+      adminStatus.textContent = "Temporary password generated. Click Save edits to store it.";
+    }
   }
   if (target?.dataset?.save) saveSubscriberEdits(lead).catch((error) => (adminStatus.textContent = error.message));
   if (target?.dataset?.delete) deleteSubscriber(lead).catch((error) => (adminStatus.textContent = error.message));

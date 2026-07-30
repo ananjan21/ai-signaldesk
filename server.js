@@ -80,6 +80,12 @@ function isAuthorized(req) {
   return token === WEBHOOK_TOKEN;
 }
 
+function hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(String(password), salt, 64).toString("hex");
+  return `scrypt:${salt}:${hash}`;
+}
+
 function basicAdminCredentials(req) {
   const header = String(req.headers.authorization || "");
   if (!header.toLowerCase().startsWith("basic ")) return null;
@@ -596,6 +602,8 @@ function normalizeLead(input) {
   const frequency = cleanText(input.frequency || "daily", 30).toLowerCase();
   const digestFormat = cleanText(input.digestFormat || "html", 30).toLowerCase();
   const subscribed = input.subscribed !== false;
+  const requestedPlan = cleanText(input.plan || "", 80);
+  const plan = requestedPlan === "paid-beta" || interests.includes("Paid Beta") ? "paid-beta" : "free-preview";
 
   return {
     id: crypto.createHash("sha256").update(email).digest("hex").slice(0, 18),
@@ -607,13 +615,17 @@ function normalizeLead(input) {
     frequency,
     digestFormat,
     subscribed,
-    plan: "free-preview",
+    plan,
     emailForwardCount: Math.max(0, Number(input.emailForwardCount || input.emailForwards || 0) || 0),
     lastEmailForwardedAt: cleanText(input.lastEmailForwardedAt || "", 60) || null,
     lastEmailSubject: cleanText(input.lastEmailSubject || "", 180),
     adminNotes: cleanText(input.adminNotes || "", 1000),
     adminTags: normalizeArray(input.adminTags).map((tag) => cleanText(tag, 60)),
     bounced: input.bounced === true,
+    paidAccessEnabled: input.paidAccessEnabled === true,
+    paidUsername: cleanText(input.paidUsername || "", 120),
+    paidPasswordHash: cleanText(input.paidPasswordHash || "", 240),
+    paidPasswordUpdatedAt: cleanText(input.paidPasswordUpdatedAt || "", 60) || null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -638,6 +650,11 @@ function sanitizeLead(lead) {
     adminNotes: cleanText(lead.adminNotes || "", 1000),
     adminTags: normalizeArray(lead.adminTags).map((tag) => cleanText(tag, 60)),
     bounced: lead.bounced === true,
+    paidAccessEnabled: lead.paidAccessEnabled === true,
+    paidUsername: cleanText(lead.paidUsername || "", 120),
+    paidPasswordHash: cleanText(lead.paidPasswordHash || "", 240),
+    paidPasswordSet: Boolean(lead.paidPasswordHash),
+    paidPasswordUpdatedAt: cleanText(lead.paidPasswordUpdatedAt || "", 60) || null,
     createdAt: cleanText(lead.createdAt || "", 60),
     updatedAt: cleanText(lead.updatedAt || "", 60),
   };
@@ -1119,6 +1136,7 @@ function csvCell(value) {
 }
 
 function leadsToCsv(leads) {
+  const exportLeads = leads.map(sanitizeLead);
   const headers = [
     "id",
     "email",
@@ -1136,10 +1154,14 @@ function leadsToCsv(leads) {
     "adminNotes",
     "adminTags",
     "bounced",
+    "paidAccessEnabled",
+    "paidUsername",
+    "paidPasswordSet",
+    "paidPasswordUpdatedAt",
     "createdAt",
     "updatedAt",
   ];
-  const rows = leads.map((lead) =>
+  const rows = exportLeads.map((lead) =>
     headers
       .map((header) => csvCell(Array.isArray(lead[header]) ? lead[header].join("; ") : lead[header]))
       .join(","),
@@ -1250,8 +1272,15 @@ async function handleAdminSubscriberUpdate(req, res) {
     ...(body.adminNotes !== undefined ? { adminNotes: cleanText(body.adminNotes, 1000) } : {}),
     ...(body.adminTags !== undefined ? { adminTags: normalizeArray(body.adminTags).map((tag) => cleanText(tag, 60)) } : {}),
     ...(body.bounced !== undefined ? { bounced: body.bounced === true } : {}),
+    ...(body.paidAccessEnabled !== undefined ? { paidAccessEnabled: body.paidAccessEnabled === true } : {}),
+    ...(body.paidUsername !== undefined ? { paidUsername: cleanText(body.paidUsername, 120) } : {}),
     updatedAt: new Date().toISOString(),
   };
+  if (body.paidPassword) {
+    next.paidPasswordHash = hashPassword(cleanText(body.paidPassword, 200));
+    next.paidPasswordUpdatedAt = next.updatedAt;
+    next.paidAccessEnabled = true;
+  }
 
   const errors = validateLead(next);
   if (next.plan === "paid") next.plan = "paid-beta";
@@ -1490,7 +1519,14 @@ async function servePost(req, res, url) {
 }
 
 async function serveStatic(req, res, url) {
-  const requested = url.pathname === "/" ? "/index.html" : url.pathname === "/admin" ? "/admin.html" : decodeURIComponent(url.pathname);
+  const requested =
+    url.pathname === "/"
+      ? "/index.html"
+      : url.pathname === "/admin"
+        ? "/admin.html"
+        : url.pathname === "/paid-beta"
+          ? "/paid-beta.html"
+          : decodeURIComponent(url.pathname);
   const filePath = path.normalize(path.join(PUBLIC_DIR, requested));
   if (!filePath.startsWith(PUBLIC_DIR)) {
     return send(res, 403, "Forbidden", { "Content-Type": "text/plain; charset=utf-8" });

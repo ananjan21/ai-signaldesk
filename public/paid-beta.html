@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI SignalDesk Paid Beta</title>
+    <meta
+      name="description"
+      content="Join the AI SignalDesk paid beta for personalized AI opportunity briefs, premium alerts, and private copilot access."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="paid-beta-body">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <span class="brand-mark signal-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+        <div>
+          <h1><span>AI</span> SignalDesk</h1>
+          <p>Paid Beta</p>
+          <p class="creator-credit">Created by Dr. Ananjan Maiti</p>
+        </div>
+      </div>
+      <nav class="topnav" aria-label="Paid beta navigation">
+        <a href="/">Dashboard</a>
+        <a href="#joinPaidBeta">Join</a>
+      </nav>
+    </header>
+
+    <main class="paid-beta-page">
+      <section class="paid-beta-hero">
+        <div>
+          <p class="eyebrow">Founding beta</p>
+          <h2>Personalized AI opportunities before they become obvious.</h2>
+          <p>
+            Get a private, priority-ranked brief for AI jobs, research, tools, startup signals, funding,
+            and content ideas matched to your goals.
+          </p>
+          <a href="#joinPaidBeta" class="primary-link">Join Paid Beta</a>
+        </div>
+        <aside>
+          <strong>What beta members get</strong>
+          <ul>
+            <li>Personalized daily AI opportunity brief</li>
+            <li>Premium research, job, model, and product alerts</li>
+            <li>Private copilot usage for turning signals into action</li>
+            <li>Early MCP and asset access</li>
+            <li>Founder feedback channel for feature requests</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section class="paid-beta-grid" aria-label="Paid beta features">
+        <article><span>01</span><strong>Personalized brief</strong><p>Signals ranked by role, interests, and market direction.</p></article>
+        <article><span>02</span><strong>Premium alerts</strong><p>Priority updates for jobs, grants, models, papers, and products.</p></article>
+        <article><span>03</span><strong>Action assets</strong><p>LinkedIn posts, research digests, prompt packs, and client notes.</p></article>
+        <article><span>04</span><strong>Private access</strong><p>Admin-managed beta login credentials and early connector access.</p></article>
+      </section>
+
+      <section class="signup-section paid-beta-signup" id="joinPaidBeta">
+        <div>
+          <p class="eyebrow">Join the beta</p>
+          <h2>Request paid beta access.</h2>
+          <p>
+            Submit your profile. We will review your goals and activate paid beta access from the admin panel.
+          </p>
+          <div class="pricing-note">
+            <strong>Founding member</strong>
+            <span>Pricing and limits can be finalized after early users validate the workflow.</span>
+          </div>
+        </div>
+        <form id="paidBetaForm" class="lead-form">
+          <label>Name<input name="name" type="text" placeholder="Your name" required /></label>
+          <label>Email<input name="email" type="email" placeholder="you@example.com" required /></label>
+          <label>
+            Role
+            <select name="role">
+              <option value="Founder">Founder</option>
+              <option value="AI researcher">AI researcher</option>
+              <option value="Job seeker">Job seeker</option>
+              <option value="Agency">Agency</option>
+              <option value="Student">Student</option>
+            </select>
+          </label>
+          <fieldset>
+            <legend>Premium interests</legend>
+            <label><input type="checkbox" name="interests" value="Paid Beta" checked /> Paid Beta</label>
+            <label><input type="checkbox" name="interests" value="AI Jobs" checked /> AI Jobs</label>
+            <label><input type="checkbox" name="interests" value="Research Papers" checked /> Research Papers</label>
+            <label><input type="checkbox" name="interests" value="AI Products" checked /> AI Products</label>
+            <label><input type="checkbox" name="interests" value="Startup News" /> Startup News</label>
+            <label><input type="checkbox" name="interests" value="Prompt Packs" /> Prompt Packs</label>
+          </fieldset>
+          <input type="hidden" name="channel" value="email" />
+          <input type="hidden" name="frequency" value="daily" />
+          <input type="hidden" name="digestFormat" value="html" />
+          <input type="hidden" name="plan" value="paid-beta" />
+          <button type="submit">Request Paid Beta Access</button>
+          <p id="paidBetaStatus" class="form-status" aria-live="polite"></p>
+        </form>
+      </section>
+    </main>
+    <script src="/paid-beta.js"></script>
+  </body>
+</html>

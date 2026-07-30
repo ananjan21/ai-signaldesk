@@ -202,6 +202,16 @@ Authorization: Bearer change-me
 
 Send JSON such as `{ "email": "subscriber@example.com", "subject": "Daily AI Opportunity Intelligence" }`.
 
+## Paid Beta Page
+
+The paid beta offer is available at:
+
+```text
+/paid-beta
+```
+
+Paid beta signups are saved as `plan: paid-beta`. In the admin panel, you can enable paid access, set a paid username, generate/reset a temporary password, and save the credential. Passwords are hashed on the server; the admin panel only shows whether a password is set.
+
 ## MCP Connector
 
 AI SignalDesk includes a Model Context Protocol server so ChatGPT, Claude Desktop, Claude Code, Cursor, Codex, and other MCP clients can inspect the feed, digest, sources, subscribers, and visual assets.

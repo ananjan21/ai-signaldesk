@@ -191,7 +191,9 @@ Open the private admin page at:
 /admin
 ```
 
-Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in the server environment, then sign in with those credentials. The panel shows subscriber emails, roles, interests, signup/update dates, active status, and email delivery counters. After an email workflow sends or forwards a digest, record that event with admin Basic auth or `WEBHOOK_TOKEN` bearer auth:
+Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` in the server environment, then sign in with those credentials. The panel shows subscriber emails, roles, interests, signup/update dates, active status, email delivery counters, notes, tags, and recent user activity. Admins can unsubscribe/resubscribe, mark bounced, mark paid beta/free, edit subscriber fields, record email forwards, delete subscribers, and download CSV.
+
+After an email workflow sends or forwards a digest, record that event with admin Basic auth or `WEBHOOK_TOKEN` bearer auth:
 
 ```text
 POST /api/admin/email-forward

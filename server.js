@@ -611,6 +611,9 @@ function normalizeLead(input) {
     emailForwardCount: Math.max(0, Number(input.emailForwardCount || input.emailForwards || 0) || 0),
     lastEmailForwardedAt: cleanText(input.lastEmailForwardedAt || "", 60) || null,
     lastEmailSubject: cleanText(input.lastEmailSubject || "", 180),
+    adminNotes: cleanText(input.adminNotes || "", 1000),
+    adminTags: normalizeArray(input.adminTags).map((tag) => cleanText(tag, 60)),
+    bounced: input.bounced === true,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -632,6 +635,9 @@ function sanitizeLead(lead) {
     emailForwardCount: Math.max(0, Number(lead.emailForwardCount || lead.emailForwards || 0) || 0),
     lastEmailForwardedAt: cleanText(lead.lastEmailForwardedAt || "", 60) || null,
     lastEmailSubject: cleanText(lead.lastEmailSubject || "", 180),
+    adminNotes: cleanText(lead.adminNotes || "", 1000),
+    adminTags: normalizeArray(lead.adminTags).map((tag) => cleanText(tag, 60)),
+    bounced: lead.bounced === true,
     createdAt: cleanText(lead.createdAt || "", 60),
     updatedAt: cleanText(lead.updatedAt || "", 60),
   };
@@ -1127,6 +1133,9 @@ function leadsToCsv(leads) {
     "emailForwardCount",
     "lastEmailForwardedAt",
     "lastEmailSubject",
+    "adminNotes",
+    "adminTags",
+    "bounced",
     "createdAt",
     "updatedAt",
   ];
@@ -1158,7 +1167,15 @@ function adminSummary({ leads, analytics, items }) {
       analytics: analytics.length,
     },
     latestForward: latestForward || null,
-    leads: sanitizedLeads,
+    leads: sanitizedLeads.map((lead) => {
+      const emailHash = crypto.createHash("sha256").update(lead.email).digest("hex").slice(0, 18);
+      return {
+        ...lead,
+        activity: analytics
+          .filter((event) => event.leadId === lead.id || event.emailHash === lead.id || event.emailHash === emailHash)
+          .slice(0, 10),
+      };
+    }),
     recentAnalytics: analytics.slice(0, 50),
     checkedAt: new Date().toISOString(),
   };
@@ -1205,6 +1222,73 @@ async function handleEmailForward(req, res) {
     at: now,
   });
   return json(res, 200, { ok: true, lead: sanitizeLead(leads[index]) });
+}
+
+async function handleAdminSubscriberUpdate(req, res) {
+  const auth = requireAdminAuth(req, res);
+  if (!auth.ok) return auth.response;
+  const body = await readBody(req);
+  const email = cleanText(body.email || "", 254).toLowerCase();
+  const id = cleanText(body.id || "", 80);
+  if (!email && !id) return json(res, 400, { ok: false, error: "Provide subscriber email or id." });
+
+  const leads = await readLeads();
+  const index = leads.findIndex((lead) => (id && lead.id === id) || (email && String(lead.email).toLowerCase() === email));
+  if (index === -1) return json(res, 404, { ok: false, error: "Subscriber not found." });
+
+  const existing = sanitizeLead(leads[index]);
+  const next = {
+    ...existing,
+    ...(body.name !== undefined ? { name: cleanText(body.name, 120) } : {}),
+    ...(body.role !== undefined ? { role: cleanText(body.role, 80) } : {}),
+    ...(body.channel !== undefined ? { channel: cleanText(body.channel, 30).toLowerCase() } : {}),
+    ...(body.frequency !== undefined ? { frequency: cleanText(body.frequency, 30).toLowerCase() } : {}),
+    ...(body.digestFormat !== undefined ? { digestFormat: cleanText(body.digestFormat, 30).toLowerCase() } : {}),
+    ...(body.interests !== undefined ? { interests: normalizeArray(body.interests).map((interest) => cleanText(interest, 80)) } : {}),
+    ...(body.subscribed !== undefined ? { subscribed: body.subscribed === true } : {}),
+    ...(body.plan !== undefined ? { plan: cleanText(body.plan, 80) } : {}),
+    ...(body.adminNotes !== undefined ? { adminNotes: cleanText(body.adminNotes, 1000) } : {}),
+    ...(body.adminTags !== undefined ? { adminTags: normalizeArray(body.adminTags).map((tag) => cleanText(tag, 60)) } : {}),
+    ...(body.bounced !== undefined ? { bounced: body.bounced === true } : {}),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const errors = validateLead(next);
+  if (next.plan === "paid") next.plan = "paid-beta";
+  if (errors.length) return json(res, 400, { ok: false, error: errors[0], errors });
+  leads[index] = next;
+  await writeLeads(leads.map(sanitizeLead).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+  await appendAnalytics({
+    id: crypto.randomUUID(),
+    type: "admin_subscriber_updated",
+    leadId: next.id,
+    emailHash: crypto.createHash("sha256").update(next.email).digest("hex").slice(0, 18),
+    at: next.updatedAt,
+  });
+  return json(res, 200, { ok: true, lead: sanitizeLead(next) });
+}
+
+async function handleAdminSubscriberDelete(req, res) {
+  const auth = requireAdminAuth(req, res);
+  if (!auth.ok) return auth.response;
+  const body = await readBody(req);
+  const email = cleanText(body.email || "", 254).toLowerCase();
+  const id = cleanText(body.id || "", 80);
+  if (!email && !id) return json(res, 400, { ok: false, error: "Provide subscriber email or id." });
+
+  const leads = await readLeads();
+  const index = leads.findIndex((lead) => (id && lead.id === id) || (email && String(lead.email).toLowerCase() === email));
+  if (index === -1) return json(res, 404, { ok: false, error: "Subscriber not found." });
+  const [removed] = leads.splice(index, 1);
+  await writeLeads(leads.map(sanitizeLead).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+  await appendAnalytics({
+    id: crypto.randomUUID(),
+    type: "admin_subscriber_deleted",
+    leadId: removed.id,
+    emailHash: crypto.createHash("sha256").update(String(removed.email || "")).digest("hex").slice(0, 18),
+    at: new Date().toISOString(),
+  });
+  return json(res, 200, { ok: true, deleted: sanitizeLead(removed) });
 }
 
 async function handleHealth(req, res) {
@@ -1302,6 +1386,14 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === "/api/admin/email-forward" && req.method === "POST") {
     return handleEmailForward(req, res);
+  }
+
+  if (url.pathname === "/api/admin/subscriber" && req.method === "PATCH") {
+    return handleAdminSubscriberUpdate(req, res);
+  }
+
+  if (url.pathname === "/api/admin/subscriber" && req.method === "DELETE") {
+    return handleAdminSubscriberDelete(req, res);
   }
 
   if (url.pathname === "/api/live-update" && req.method === "POST") {

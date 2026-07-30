@@ -312,6 +312,37 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
+function stripMarkupNoise(value) {
+  const cleaned = String(value ?? "")
+    .replace(/<\s*(br|\/p|\/div|\/li|\/h[1-6])\s*\/?>/gi, "\n")
+    .replace(/<\s*li\b[^>]*>/gi, "- ")
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\[[^\]]*(?:&|:)[^\]]+\]:[a-z0-9-]+/gi, " ")
+    .replace(/\[[^\]]*(?:&|:)[^\]]+\]/g, " ")
+    .replace(/--tw-[a-z0-9-]+:\s*[^;]+;?/gi, " ")
+    .replace(/\b(?:class|style|data-[\w-]+|aria-[\w-]+)=['"][^'"]*['"]/gi, " ")
+    .replace(/\b(?:oklch|rgb|rgba|hsl|hsla)\([^)]*\)/gi, " ")
+    .replace(/scrollbar-(?:color|width):\s*[^;]+;?/gi, " ")
+    .replace(/[{}]/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return cleaned
+    .split(/\r?\n/)
+    .filter((line, index, lines) => line.trim() || lines[index - 1]?.trim())
+    .filter((line, index, lines) => line.trim().toLowerCase() !== lines[index - 1]?.trim().toLowerCase())
+    .join("\n")
+    .trim();
+}
+
 function isMarkdownTableSeparator(line) {
   const cells = line
     .trim()
@@ -351,7 +382,7 @@ function markdownTableToHtml(lines) {
 }
 
 function renderMarkdownTables(value) {
-  const lines = String(value ?? "").split(/\r?\n/);
+  const lines = stripMarkupNoise(value).split(/\r?\n/);
   const blocks = [];
   for (let index = 0; index < lines.length; index += 1) {
     const current = lines[index];

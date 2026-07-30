@@ -357,6 +357,20 @@ function cleanText(value, maxLength = 4000) {
     .slice(0, maxLength);
 }
 
+function plainFeedText(value, maxLength = 1200) {
+  return cleanText(value, maxLength)
+    .replace(/\[[^\]]*(?:&|:)[^\]]+\]:[a-z0-9-]+/gi, " ")
+    .replace(/\[[^\]]*(?:&|:)[^\]]+\]/g, " ")
+    .replace(/--tw-[a-z0-9-]+:\s*[^;]+;?/gi, " ")
+    .replace(/\b(?:class|style|data-[\w-]+|aria-[\w-]+)=['"][^'"]*['"]/gi, " ")
+    .replace(/\b(?:oklch|rgb|rgba|hsl|hsla)\([^)]*\)/gi, " ")
+    .replace(/[{}]/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, maxLength);
+}
+
 function validHttpUrl(value, allowEmpty = true) {
   const text = String(value || "").trim();
   if (!text) return allowEmpty;
@@ -678,14 +692,14 @@ function validateLead(lead) {
 
 function compactChatItem(item) {
   return {
-    title: item.title,
-    source: item.company,
-    category: item.category,
+    title: plainFeedText(item.title, 180),
+    source: plainFeedText(item.company, 140),
+    category: canonicalCategory(item.category),
     score: item.fitScore,
     date: item.publishedAt,
-    summary: item.summary,
+    summary: plainFeedText(item.summary || item.content, 700),
     link: item.link,
-    tags: item.tags,
+    tags: normalizeArray(item.tags).map((tag) => plainFeedText(tag, 40)).filter(Boolean),
   };
 }
 
@@ -799,6 +813,8 @@ async function handleChat(req, res) {
     `The public app URL is ${OPENROUTER_SITE_URL}. Do not mention or link to other SignalDesk domains.`,
     "Answer in a polished, skimmable markdown style.",
     "When the user asks for an output mode, format the answer as the requested asset: LinkedIn Post, Newsletter Brief, Client Report, Prompt Pack, Image Creative Brief, or Research Digest.",
+    "Never include raw HTML tags, CSS classes, inline styles, Tailwind class names, escaped HTML, or source markup. Convert source descriptions into clean plain English.",
+    "Avoid repeating category headings or tag lists unless they directly help the answer.",
     "For image and visual marketing requests, include prompt ideas, best use case, suggested style, model suggestion, campaign angle, and source-backed context.",
     "Default response structure:",
     "1. A one-sentence direct answer.",

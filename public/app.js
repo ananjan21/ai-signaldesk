@@ -22,6 +22,8 @@ const chatStatus = document.querySelector("#chatStatus");
 const chatSendButton = document.querySelector("#chatSendButton");
 const chatSuggestions = document.querySelector("#chatSuggestions");
 const exportChatButton = document.querySelector("#exportChatButton");
+const chatDockButton = document.querySelector("#chatDockButton");
+const closeChatDockButton = document.querySelector("#closeChatDockButton");
 const promptQueueList = document.querySelector("#promptQueueList");
 const clearQueueButton = document.querySelector("#clearQueueButton");
 const contextButtons = [...document.querySelectorAll(".category-snapshot button")];
@@ -953,6 +955,15 @@ function exportChatHtml() {
   URL.revokeObjectURL(url);
 }
 
+function setChatDock(open) {
+  document.body.classList.toggle("chat-dock-open", open);
+  chatDockButton.setAttribute("aria-expanded", String(open));
+  if (open) {
+    setTimeout(() => chatInput.focus(), 220);
+    trackEvent("chat_dock_open");
+  }
+}
+
 searchInput.addEventListener("input", (event) => {
   state.query = event.target.value;
   render();
@@ -976,6 +987,11 @@ dailyBriefButton.addEventListener("click", () => {
 });
 chatForm.addEventListener("submit", submitChat);
 exportChatButton.addEventListener("click", exportChatHtml);
+chatDockButton.addEventListener("click", () => setChatDock(!document.body.classList.contains("chat-dock-open")));
+closeChatDockButton.addEventListener("click", () => setChatDock(false));
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && document.body.classList.contains("chat-dock-open")) setChatDock(false);
+});
 paidBetaButton.addEventListener("click", () => {
   paidBetaInterest.checked = true;
   document.querySelector("#joinPreview").scrollIntoView({ behavior: "smooth", block: "start" });

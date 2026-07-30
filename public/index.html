@@ -362,7 +362,10 @@
         <div class="chat-panel">
           <div class="chat-toolbar" aria-label="Chat actions">
             <span>Opportunity copilot</span>
-            <button id="exportChatButton" type="button">Export HTML</button>
+            <div>
+              <button id="exportChatButton" type="button">Export HTML</button>
+              <button id="closeChatDockButton" class="chat-dock-close" type="button" aria-label="Close chat">Close</button>
+            </div>
           </div>
           <div id="chatSetupState" class="product-state chat-setup-state" hidden>
             <img
@@ -457,6 +460,11 @@
         </form>
       </section>
     </main>
+
+    <button id="chatDockButton" class="chat-dock-button" type="button" aria-controls="aiChat" aria-expanded="false">
+      <span aria-hidden="true">AI</span>
+      <strong>Chat</strong>
+    </button>
 
     <template id="emptyTemplate">
       <div class="empty-state">

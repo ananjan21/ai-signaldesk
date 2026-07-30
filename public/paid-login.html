@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI SignalDesk Paid Beta Login</title>
+    <meta name="robots" content="noindex,nofollow" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="paid-beta-body">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <span class="brand-mark signal-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+        <div>
+          <h1><span>AI</span> SignalDesk</h1>
+          <p>Paid Beta Login</p>
+          <p class="creator-credit">Created by Dr. Ananjan Maiti</p>
+        </div>
+      </div>
+      <nav class="topnav" aria-label="Paid beta login navigation">
+        <a href="/">Dashboard</a>
+        <a href="/paid-beta">Paid Beta</a>
+      </nav>
+    </header>
+
+    <main class="paid-login-shell">
+      <section class="paid-login-panel" id="paidLoginPanel">
+        <p class="eyebrow">Members only</p>
+        <h2>Open your Paid Beta workspace.</h2>
+        <p>Use the paid beta username and temporary password issued from the admin panel.</p>
+        <form id="paidLoginForm" class="admin-login-form">
+          <label>Username<input id="paidUsername" type="text" autocomplete="username" required /></label>
+          <label>Password<input id="paidPassword" type="password" autocomplete="current-password" required /></label>
+          <button type="submit">Open Paid Beta</button>
+        </form>
+        <p id="paidLoginStatus" class="form-status" aria-live="polite"></p>
+      </section>
+
+      <section class="paid-member-panel" id="paidMemberPanel" hidden>
+        <header class="admin-header">
+          <div>
+            <p class="eyebrow">Paid Beta Workspace</p>
+            <h1 id="memberTitle">Welcome back</h1>
+            <p id="memberMeta">Your personalized AI opportunity workspace is ready.</p>
+          </div>
+          <div class="admin-actions">
+            <a href="/api/digest/daily.html" target="_blank" rel="noreferrer">Open digest</a>
+            <a href="/">Dashboard</a>
+            <button id="paidLogout" type="button">Logout</button>
+          </div>
+        </header>
+
+        <div class="paid-member-grid" id="featureList"></div>
+
+        <section class="paid-brief">
+          <div>
+            <p class="eyebrow">Personalized brief</p>
+            <h2>Priority signals for your goals.</h2>
+          </div>
+          <div id="briefItems" class="paid-brief-list"></div>
+        </section>
+
+        <section class="paid-assets">
+          <p class="eyebrow">Private access options</p>
+          <div id="assetLinks"></div>
+        </section>
+      </section>
+    </main>
+    <script src="/paid-login.js"></script>
+  </body>
+</html>

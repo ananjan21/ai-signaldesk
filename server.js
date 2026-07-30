@@ -86,6 +86,14 @@ function hashPassword(password) {
   return `scrypt:${salt}:${hash}`;
 }
 
+function verifyPassword(password, storedHash = "") {
+  const [scheme, salt, hash] = String(storedHash).split(":");
+  if (scheme !== "scrypt" || !salt || !hash) return false;
+  const candidate = crypto.scryptSync(String(password), salt, 64);
+  const expected = Buffer.from(hash, "hex");
+  return candidate.length === expected.length && crypto.timingSafeEqual(candidate, expected);
+}
+
 function basicAdminCredentials(req) {
   const header = String(req.headers.authorization || "");
   if (!header.toLowerCase().startsWith("basic ")) return null;
@@ -1258,7 +1266,11 @@ async function handleAdminSubscriberUpdate(req, res) {
   const index = leads.findIndex((lead) => (id && lead.id === id) || (email && String(lead.email).toLowerCase() === email));
   if (index === -1) return json(res, 404, { ok: false, error: "Subscriber not found." });
 
-  const existing = sanitizeLead(leads[index]);
+  const existingRaw = leads[index];
+  const existing = {
+    ...sanitizeLead(existingRaw),
+    paidPasswordHash: cleanText(existingRaw.paidPasswordHash || "", 240),
+  };
   const next = {
     ...existing,
     ...(body.name !== undefined ? { name: cleanText(body.name, 120) } : {}),
@@ -1295,6 +1307,69 @@ async function handleAdminSubscriberUpdate(req, res) {
     at: next.updatedAt,
   });
   return json(res, 200, { ok: true, lead: sanitizeLead(next) });
+}
+
+function paidBetaFeaturesFor(lead, items) {
+  const interests = new Set((lead.interests || []).map((item) => item.toLowerCase()));
+  const personalized = items
+    .filter((item) => {
+      const text = [item.category, item.title, item.summary, ...(item.tags || [])].join(" ").toLowerCase();
+      return !interests.size || [...interests].some((interest) => text.includes(interest.replace(" papers", "").replace("ai ", "")));
+    })
+    .slice(0, 8);
+  const sourceItems = personalized.length ? personalized : items.slice(0, 8);
+  return {
+    profile: {
+      name: lead.name,
+      email: lead.email,
+      role: lead.role,
+      plan: lead.plan,
+      interests: lead.interests,
+      paidUsername: lead.paidUsername,
+    },
+    features: [
+      "Personalized daily AI opportunity brief",
+      "Premium job, research, model, and product alerts",
+      "Private copilot prompts for LinkedIn, newsletters, and client reports",
+      "Early MCP connector and asset access",
+      "Founder feedback channel for feature requests",
+    ],
+    brief: {
+      title: "Paid Beta Daily Priority Brief",
+      generatedAt: new Date().toISOString(),
+      items: sourceItems.map(compactChatItem),
+    },
+    assets: [
+      { label: "Daily digest", href: "/api/digest/daily.html" },
+      { label: "Live dashboard", href: "/" },
+      { label: "MCP endpoint", href: "/mcp" },
+    ],
+  };
+}
+
+async function handlePaidBetaLogin(req, res) {
+  if (!checkRateLimit(req, res, "paid-beta-login", 20)) return;
+  const body = await readBody(req);
+  const username = cleanText(body.username || "", 120);
+  const password = cleanText(body.password || "", 200);
+  if (!username || !password) return json(res, 400, { ok: false, error: "Username and password are required." });
+
+  const leads = await readLeads();
+  const rawLead = leads.find((lead) => lead.paidUsername === username && lead.plan === "paid-beta" && lead.paidAccessEnabled === true);
+  if (!rawLead || !verifyPassword(password, rawLead.paidPasswordHash)) {
+    return json(res, 401, { ok: false, error: "Invalid paid beta login." });
+  }
+
+  const lead = sanitizeLead(rawLead);
+  const items = await readItems();
+  await appendAnalytics({
+    id: crypto.randomUUID(),
+    type: "paid_beta_login_success",
+    leadId: lead.id,
+    emailHash: crypto.createHash("sha256").update(lead.email).digest("hex").slice(0, 18),
+    at: new Date().toISOString(),
+  });
+  return json(res, 200, { ok: true, ...paidBetaFeaturesFor(lead, items) });
 }
 
 async function handleAdminSubscriberDelete(req, res) {
@@ -1425,6 +1500,10 @@ async function handleApi(req, res, url) {
     return handleAdminSubscriberDelete(req, res);
   }
 
+  if (url.pathname === "/api/paid-beta/login" && req.method === "POST") {
+    return handlePaidBetaLogin(req, res);
+  }
+
   if (url.pathname === "/api/live-update" && req.method === "POST") {
     return handleLiveUpdate(req, res);
   }
@@ -1526,6 +1605,8 @@ async function serveStatic(req, res, url) {
         ? "/admin.html"
         : url.pathname === "/paid-beta"
           ? "/paid-beta.html"
+          : url.pathname === "/paid-login"
+            ? "/paid-login.html"
           : decodeURIComponent(url.pathname);
   const filePath = path.normalize(path.join(PUBLIC_DIR, requested));
   if (!filePath.startsWith(PUBLIC_DIR)) {

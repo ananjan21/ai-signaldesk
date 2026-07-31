@@ -1723,7 +1723,7 @@ function paidBetaFeaturesFor(lead, items) {
     assets: [
       { label: "Daily digest", href: "/api/digest/daily.html" },
       { label: "Live dashboard", href: "/" },
-      { label: "MCP endpoint", href: "/mcp" },
+      { label: "Connector guide", href: "/connectors" },
     ],
   };
 }
@@ -1993,7 +1993,9 @@ async function serveStatic(req, res, url) {
           ? "/paid-beta.html"
           : url.pathname === "/paid-login"
             ? "/paid-login.html"
-          : decodeURIComponent(url.pathname);
+            : url.pathname === "/connectors"
+              ? "/connectors.html"
+              : decodeURIComponent(url.pathname);
   const filePath = path.normalize(path.join(PUBLIC_DIR, requested));
   if (!filePath.startsWith(PUBLIC_DIR)) {
     return send(res, 403, "Forbidden", { "Content-Type": "text/plain; charset=utf-8" });

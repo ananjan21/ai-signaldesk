@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI SignalDesk Connectors</title>
+    <meta
+      name="description"
+      content="Connector, MCP, API, and asset access options for AI SignalDesk."
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body class="connector-body">
+    <header class="topbar">
+      <div class="brand-lockup">
+        <span class="brand-mark signal-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+        <div>
+          <h1><span>AI</span> SignalDesk</h1>
+          <p>Connectors & assets</p>
+          <p class="creator-credit">Created by Dr. Ananjan Maiti</p>
+        </div>
+      </div>
+      <nav class="topnav" aria-label="Connector navigation">
+        <a href="/">Dashboard</a>
+        <a href="/paid-beta">Paid Beta</a>
+        <a href="/admin">Admin</a>
+      </nav>
+    </header>
+
+    <main class="connector-shell">
+      <section class="connector-hero">
+        <p class="eyebrow">Connector hub</p>
+        <h2>Connect this app to ChatGPT, Claude, Perplexity, or another VPS app.</h2>
+        <p>
+          Use MCP when the AI client supports tools. Use REST API links when the client only supports URLs or custom actions.
+          Keep tokens private.
+        </p>
+      </section>
+
+      <section class="connector-grid" aria-label="Connector options">
+        <article class="connector-card">
+          <span>01</span>
+          <h3>MCP endpoint</h3>
+          <p>Use this for ChatGPT, Claude, Cursor, Codex, and other MCP-capable clients.</p>
+          <code>https://signaldesk.ailabworks.tech/mcp</code>
+          <small>Auth header: Authorization: Bearer &lt;MCP_TOKEN&gt;</small>
+        </article>
+
+        <article class="connector-card">
+          <span>02</span>
+          <h3>Data API</h3>
+          <p>Use these URLs when a client can fetch JSON but does not support MCP.</p>
+          <code>GET /api/posts</code>
+          <code>GET /api/trends</code>
+          <code>GET /api/digest/daily</code>
+        </article>
+
+        <article class="connector-card">
+          <span>03</span>
+          <h3>Assets</h3>
+          <p>Use public asset URLs or the MCP asset tools to inspect available images and files.</p>
+          <code>https://signaldesk.ailabworks.tech/assets/</code>
+          <small>MCP tools: get_asset_manifest, get_asset</small>
+        </article>
+      </section>
+
+      <section class="connector-panel">
+        <div>
+          <p class="eyebrow">Copy setup</p>
+          <h2>Remote MCP configuration</h2>
+        </div>
+        <pre><code>{
+  "type": "mcp",
+  "server_label": "ai-signaldesk",
+  "server_url": "https://signaldesk.ailabworks.tech/mcp",
+  "headers": {
+    "Authorization": "Bearer &lt;MCP_TOKEN&gt;"
+  }
+}</code></pre>
+      </section>
+
+      <section class="connector-panel">
+        <div>
+          <p class="eyebrow">What AI clients can read</p>
+          <h2>Available connector capabilities</h2>
+        </div>
+        <div class="connector-list">
+          <article><strong>Feed</strong><span>Current jobs, papers, tools, prompts, startup signals, and source links.</span></article>
+          <article><strong>Trends</strong><span>Hot topics, ranked titles, category pulse, and weekly/monthly buckets.</span></article>
+          <article><strong>Digest</strong><span>Email-ready daily summary in JSON, text, or HTML.</span></article>
+          <article><strong>Assets</strong><span>Hero images, category covers, empty states, and public asset metadata.</span></article>
+        </div>
+      </section>
+
+      <section class="connector-panel">
+        <div>
+          <p class="eyebrow">Security note</p>
+          <h2>Do not paste secrets into public chat.</h2>
+        </div>
+        <p>
+          Store MCP tokens, webhook tokens, and OpenRouter keys in the client connector settings or VPS environment.
+          The public dashboard shows endpoints only, not secret values.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

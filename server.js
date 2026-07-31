@@ -8,6 +8,8 @@ const PORT = Number(process.env.PORT || 4173);
 const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN || "";
 const N8N_LIVE_WEBHOOK_URL = process.env.N8N_LIVE_WEBHOOK_URL || "";
 const N8N_LIVE_WEBHOOK_TOKEN = process.env.N8N_LIVE_WEBHOOK_TOKEN || "";
+const N8N_EMAIL_WEBHOOK_URL = process.env.N8N_EMAIL_WEBHOOK_URL || "";
+const N8N_EMAIL_WEBHOOK_TOKEN = process.env.N8N_EMAIL_WEBHOOK_TOKEN || "";
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "google/gemini-3.5-flash-lite";
 const OPENROUTER_SITE_URL = process.env.OPENROUTER_SITE_URL || `http://localhost:${PORT}`;
@@ -1130,11 +1132,15 @@ function renderDailyDigestText(items) {
 }
 
 function mailConfigured() {
+  return Boolean(N8N_EMAIL_WEBHOOK_URL || (SMTP_HOST && SMTP_FROM));
+}
+
+function smtpConfigured() {
   return Boolean(SMTP_HOST && SMTP_FROM);
 }
 
 function mailTransport() {
-  if (!mailConfigured()) {
+  if (!smtpConfigured()) {
     const error = new Error("Email is not configured. Set SMTP_HOST and SMTP_FROM on the VPS.");
     error.status = 503;
     throw error;
@@ -1147,7 +1153,54 @@ function mailTransport() {
   });
 }
 
+async function sendN8nEmail({ to, subject, html, text }) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), LIVE_UPDATE_TIMEOUT_MS);
+  try {
+    const response = await fetch(N8N_EMAIL_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(N8N_EMAIL_WEBHOOK_TOKEN ? { "x-email-webhook-token": N8N_EMAIL_WEBHOOK_TOKEN } : {}),
+      },
+      body: JSON.stringify({
+        to,
+        subject,
+        html,
+        text,
+        source: "ai-signaldesk-webapp",
+        requestedAt: new Date().toISOString(),
+      }),
+      signal: controller.signal,
+    });
+    const responseText = await response.text();
+    let payload = null;
+    try {
+      payload = JSON.parse(responseText);
+    } catch {
+      payload = { response: responseText.slice(0, 1000) };
+    }
+    if (!response.ok || payload?.ok === false) {
+      const error = new Error(payload?.error || payload?.message || `n8n email webhook failed with ${response.status}`);
+      error.status = response.status || 502;
+      error.payload = payload;
+      throw error;
+    }
+    return {
+      provider: "n8n-gmail",
+      messageId: payload?.messageId || payload?.id || "",
+      threadId: payload?.threadId || "",
+      response: payload,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function sendMail({ to, subject, html, text }) {
+  if (N8N_EMAIL_WEBHOOK_URL) {
+    return sendN8nEmail({ to, subject, html, text });
+  }
   const info = await mailTransport().sendMail({
     from: SMTP_FROM,
     to,
@@ -1157,6 +1210,7 @@ async function sendMail({ to, subject, html, text }) {
     text,
   });
   return {
+    provider: "smtp",
     messageId: info.messageId || "",
     accepted: info.accepted || [],
     rejected: info.rejected || [],
@@ -1757,10 +1811,10 @@ async function handleAdminSendTestEmail(req, res) {
     return json(res, 503, {
       ok: false,
       error: "Email is not configured on the VPS.",
-      setup: "Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM in the deployment environment.",
+      setup: "Set N8N_EMAIL_WEBHOOK_URL for Gmail via n8n, or set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM.",
       configured: {
-        smtpHost: Boolean(SMTP_HOST),
-        smtpFrom: Boolean(SMTP_FROM),
+        n8nEmailWebhook: Boolean(N8N_EMAIL_WEBHOOK_URL),
+        smtp: smtpConfigured(),
       },
     });
   }
@@ -1969,6 +2023,8 @@ async function handleHealth(req, res) {
       openRouter: Boolean(OPENROUTER_API_KEY),
       agenticAiLiveUpdate: Boolean(N8N_LIVE_WEBHOOK_URL),
       email: mailConfigured(),
+      n8nEmailWebhook: Boolean(N8N_EMAIL_WEBHOOK_URL),
+      smtpEmail: smtpConfigured(),
     },
     counts: {
       posts: items.length,

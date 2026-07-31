@@ -56,6 +56,9 @@ SMTP_REPLY_TO=<set-reply-to-email-or-empty>
 LIVE_WEBHOOK_URL=<set-external-automation-webhook-url-or-empty>
 LIVE_WEBHOOK_TOKEN=<set-external-automation-token-or-empty>
 
+N8N_EMAIL_WEBHOOK_URL=<set-n8n-gmail-email-webhook-url-or-empty>
+N8N_EMAIL_WEBHOOK_TOKEN=<set-n8n-email-token-or-empty>
+
 MAX_BODY_BYTES=1048576
 MAX_POSTS_PER_REQUEST=50
 RATE_LIMIT_WINDOW_MS=900000
@@ -160,7 +163,27 @@ Recommended payload shape:
 
 ## SMTP Email Setup
 
-Use SMTP for subscription welcome emails, admin test emails, and digest delivery.
+Use either an n8n Gmail webhook or SMTP for subscription welcome emails, admin test emails, and digest delivery.
+
+Preferred n8n Gmail pattern:
+
+```env
+N8N_EMAIL_WEBHOOK_URL=https://n8n.example.com/webhook/<private-email-webhook-path>
+N8N_EMAIL_WEBHOOK_TOKEN=<optional-shared-token>
+```
+
+The app posts this payload to n8n:
+
+```json
+{
+  "to": "subscriber@example.com",
+  "subject": "Email subject",
+  "html": "<p>Email body</p>",
+  "text": "Email body"
+}
+```
+
+Fallback SMTP pattern:
 
 | Env | Purpose |
 |---|---|

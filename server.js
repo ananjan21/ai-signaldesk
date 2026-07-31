@@ -39,6 +39,8 @@ const mimeTypes = {
   ".svg": "image/svg+xml; charset=utf-8",
 };
 
+const storageWriteQueues = new Map();
+
 function send(res, status, body, headers = {}) {
   res.writeHead(status, {
     "Cache-Control": "no-store",
@@ -252,9 +254,34 @@ async function readJsonArray(file, label) {
     parsed = JSON.parse(raw || "[]");
   } catch (error) {
     logError(`${label} JSON is invalid`, error, { file });
-    throw new Error(`${label} storage is invalid JSON.`);
+    const backupFile = `${file}.invalid-${Date.now()}.bak`;
+    try {
+      await fs.copyFile(file, backupFile);
+      logInfo(`${label} JSON backup created`, { file: backupFile });
+    } catch (backupError) {
+      logError(`${label} JSON backup failed`, backupError, { file });
+    }
+    return [];
   }
   return Array.isArray(parsed) ? parsed : [];
+}
+
+async function writeJsonArray(file, items) {
+  await ensureStore();
+  const tmpFile = `${file}.${process.pid}.${Date.now()}.tmp`;
+  const payload = `${JSON.stringify(items, null, 2)}\n`;
+  const previous = storageWriteQueues.get(file) || Promise.resolve();
+  const next = previous
+    .catch(() => {})
+    .then(async () => {
+      await fs.writeFile(tmpFile, payload, "utf8");
+      await fs.rename(tmpFile, file);
+    })
+    .finally(() => {
+      if (storageWriteQueues.get(file) === next) storageWriteQueues.delete(file);
+    });
+  storageWriteQueues.set(file, next);
+  return next;
 }
 
 async function readItems() {
@@ -263,8 +290,7 @@ async function readItems() {
 }
 
 async function writeItems(items) {
-  await ensureStore();
-  await fs.writeFile(DATA_FILE, `${JSON.stringify(items, null, 2)}\n`, "utf8");
+  await writeJsonArray(DATA_FILE, items);
 }
 
 async function readLeads() {
@@ -272,8 +298,7 @@ async function readLeads() {
 }
 
 async function writeLeads(leads) {
-  await ensureStore();
-  await fs.writeFile(LEADS_FILE, `${JSON.stringify(leads, null, 2)}\n`, "utf8");
+  await writeJsonArray(LEADS_FILE, leads);
 }
 
 async function readAnalytics() {
@@ -283,7 +308,7 @@ async function readAnalytics() {
 async function appendAnalytics(event) {
   const events = await readAnalytics();
   events.unshift(event);
-  await fs.writeFile(ANALYTICS_FILE, `${JSON.stringify(events.slice(0, 5000), null, 2)}\n`, "utf8");
+  await writeJsonArray(ANALYTICS_FILE, events.slice(0, 5000));
 }
 
 async function readBody(req) {

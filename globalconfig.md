@@ -45,6 +45,14 @@ OPENROUTER_MODEL=qwen/qwen3.7-flash
 OPENROUTER_SITE_URL=<APP_PUBLIC_URL>
 OPENROUTER_SITE_NAME=<APP_NAME>
 
+SMTP_HOST=<set-smtp-host>
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=<set-smtp-username>
+SMTP_PASS=<set-smtp-password>
+SMTP_FROM=<set-from-email>
+SMTP_REPLY_TO=<set-reply-to-email-or-empty>
+
 LIVE_WEBHOOK_URL=<set-external-automation-webhook-url-or-empty>
 LIVE_WEBHOOK_TOKEN=<set-external-automation-token-or-empty>
 
@@ -148,6 +156,40 @@ Recommended payload shape:
     }
   ]
 }
+```
+
+## SMTP Email Setup
+
+Use SMTP for subscription welcome emails, admin test emails, and digest delivery.
+
+| Env | Purpose |
+|---|---|
+| `SMTP_HOST` | SMTP server host |
+| `SMTP_PORT` | Usually `587` for STARTTLS or `465` for SSL |
+| `SMTP_SECURE` | `true` for port `465`, otherwise `false` |
+| `SMTP_USER` | SMTP login username |
+| `SMTP_PASS` | SMTP login password |
+| `SMTP_FROM` | Sender address shown to recipients |
+| `SMTP_REPLY_TO` | Optional reply-to address |
+
+Example:
+
+```env
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=mailer@example.com
+SMTP_PASS=<smtp-password>
+SMTP_FROM="App Name <mailer@example.com>"
+SMTP_REPLY_TO=support@example.com
+```
+
+Backend should send email only from the server. Frontend should call your own API, such as:
+
+```http
+POST <APP_PUBLIC_URL>/api/admin/send-test-email
+Authorization: Basic <admin-credentials>
+Content-Type: application/json
 ```
 
 ## Optional Live Update Connector
@@ -345,4 +387,3 @@ Use HTTPS before connecting remote MCP clients.
 - Do not commit `.env`, API keys, private SSH keys, token files, logs, or user data.
 - Never send OpenRouter requests directly from the browser.
 - Rotate tokens after sharing any config with another app or team.
-

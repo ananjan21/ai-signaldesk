@@ -2,6 +2,7 @@ const http = require("node:http");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
+const nodemailer = require("nodemailer");
 
 const PORT = Number(process.env.PORT || 4173);
 const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN || "";
@@ -13,6 +14,14 @@ const OPENROUTER_SITE_URL = process.env.OPENROUTER_SITE_URL || `http://localhost
 const OPENROUTER_SITE_NAME = process.env.OPENROUTER_SITE_NAME || "AI SignalDesk";
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || "";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "";
+const SMTP_HOST = process.env.SMTP_HOST || "";
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_SECURE =
+  String(process.env.SMTP_SECURE || "").toLowerCase() === "true" || SMTP_PORT === 465;
+const SMTP_USER = process.env.SMTP_USER || "";
+const SMTP_PASS = process.env.SMTP_PASS || "";
+const SMTP_FROM = process.env.SMTP_FROM || process.env.MAIL_FROM || SMTP_USER;
+const SMTP_REPLY_TO = process.env.SMTP_REPLY_TO || SMTP_FROM;
 const ROOT = __dirname;
 const PUBLIC_DIR = path.join(ROOT, "public");
 const DATA_DIR = path.join(ROOT, "data");
@@ -852,9 +861,35 @@ async function handleLeadSignup(req, res) {
     at: new Date().toISOString(),
   });
 
+  let emailDelivery = { sent: false, skipped: true };
+  try {
+    emailDelivery = await sendWelcomeEmailIfConfigured(lead);
+  } catch (error) {
+    logError("Subscription email failed", error, { leadId: lead.id });
+    await appendAnalytics({
+      id: crypto.randomUUID(),
+      type: "subscription_email_failed",
+      leadId: lead.id,
+      emailHash: lead.id,
+      error: error.message || String(error),
+      at: new Date().toISOString(),
+    });
+    emailDelivery = { sent: false, skipped: false, error: error.message || "Email sending failed." };
+  }
+
   return json(res, 201, {
     ok: true,
-    message: "Subscribed to the daily formatted AI opportunity email.",
+    message: emailDelivery.sent
+      ? "Subscribed and welcome email sent."
+      : mailConfigured()
+        ? "Subscribed, but the welcome email could not be sent."
+        : "Subscribed. Email sending is not configured on the server yet.",
+    emailDelivery: {
+      sent: emailDelivery.sent === true,
+      skipped: emailDelivery.skipped === true,
+      configured: mailConfigured(),
+      error: emailDelivery.error || undefined,
+    },
     lead: {
       id: lead.id,
       email: lead.email,
@@ -1092,6 +1127,83 @@ function renderDailyDigestText(items) {
     lines.push("");
   }
   return lines.join("\n");
+}
+
+function mailConfigured() {
+  return Boolean(SMTP_HOST && SMTP_FROM);
+}
+
+function mailTransport() {
+  if (!mailConfigured()) {
+    const error = new Error("Email is not configured. Set SMTP_HOST and SMTP_FROM on the VPS.");
+    error.status = 503;
+    throw error;
+  }
+  return nodemailer.createTransport({
+    host: SMTP_HOST,
+    port: SMTP_PORT,
+    secure: SMTP_SECURE,
+    ...(SMTP_USER || SMTP_PASS ? { auth: { user: SMTP_USER, pass: SMTP_PASS } } : {}),
+  });
+}
+
+async function sendMail({ to, subject, html, text }) {
+  const info = await mailTransport().sendMail({
+    from: SMTP_FROM,
+    to,
+    replyTo: SMTP_REPLY_TO || undefined,
+    subject,
+    html,
+    text,
+  });
+  return {
+    messageId: info.messageId || "",
+    accepted: info.accepted || [],
+    rejected: info.rejected || [],
+    response: info.response || "",
+  };
+}
+
+function renderWelcomeEmailHtml(lead, items) {
+  const digestHtml = renderDailyDigestHtml(items);
+  return digestHtml.replace(
+    "Here is today's formatted AI opportunity brief, ranked for action and grouped by market signal.",
+    `Hi ${escapeHtml(lead.name || lead.email)}, your subscription is active. Here is today's formatted AI opportunity brief, ranked for action and grouped by market signal.`,
+  );
+}
+
+async function sendWelcomeEmailIfConfigured(lead) {
+  if (!mailConfigured() || lead.channel !== "email" || !lead.subscribed) {
+    await appendAnalytics({
+      id: crypto.randomUUID(),
+      type: "subscription_email_skipped",
+      leadId: lead.id,
+      emailHash: lead.id,
+      configured: mailConfigured(),
+      channel: lead.channel,
+      subscribed: lead.subscribed,
+      at: new Date().toISOString(),
+    });
+    return { sent: false, skipped: true };
+  }
+  const items = (await readItems()).slice(0, 24);
+  const subject = `Welcome to AI SignalDesk - ${formatEmailDate()}`;
+  const result = await sendMail({
+    to: lead.email,
+    subject,
+    html: renderWelcomeEmailHtml(lead, items),
+    text: `Hi ${lead.name || lead.email}, your subscription is active.\n\n${renderDailyDigestText(items)}`,
+  });
+  await appendAnalytics({
+    id: crypto.randomUUID(),
+    type: "subscription_email_sent",
+    leadId: lead.id,
+    emailHash: lead.id,
+    subject,
+    messageId: result.messageId,
+    at: new Date().toISOString(),
+  });
+  return { sent: true, ...result };
 }
 
 async function handleDailyDigest(req, res, htmlOnly = false) {
@@ -1634,6 +1746,75 @@ async function handleEmailForward(req, res) {
   return json(res, 200, { ok: true, lead: sanitizeLead(leads[index]) });
 }
 
+async function handleAdminSendTestEmail(req, res) {
+  const auth = requireAdminAuth(req, res);
+  if (!auth.ok) return auth.response;
+  const body = await readBody(req);
+  const email = cleanText(body.email || "", 254).toLowerCase();
+  const id = cleanText(body.id || "", 80);
+  if (!email && !id) return json(res, 400, { ok: false, error: "Provide subscriber email or id." });
+  if (!mailConfigured()) {
+    return json(res, 503, {
+      ok: false,
+      error: "Email is not configured on the VPS.",
+      setup: "Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM in the deployment environment.",
+      configured: {
+        smtpHost: Boolean(SMTP_HOST),
+        smtpFrom: Boolean(SMTP_FROM),
+      },
+    });
+  }
+
+  const [leads, items] = await Promise.all([readLeads(), readItems()]);
+  const index = leads.findIndex((lead) => (id && lead.id === id) || (email && String(lead.email).toLowerCase() === email));
+  if (index === -1) return json(res, 404, { ok: false, error: "Subscriber not found." });
+  const lead = {
+    ...sanitizeLead(leads[index]),
+    paidPasswordHash: cleanText(leads[index].paidPasswordHash || "", 240),
+  };
+  const topItems = items.slice(0, 24);
+  const subject = cleanText(body.subject || `Test Daily AI Opportunity Intelligence - ${formatEmailDate()}`, 180);
+  try {
+    const delivery = await sendMail({
+      to: lead.email,
+      subject,
+      html: renderDailyDigestHtml(topItems),
+      text: renderDailyDigestText(topItems),
+    });
+    const now = new Date().toISOString();
+    leads[index] = {
+      ...lead,
+      emailForwardCount: Number(lead.emailForwardCount || 0) + 1,
+      lastEmailForwardedAt: now,
+      lastEmailSubject: subject,
+      updatedAt: now,
+    };
+    await writeLeads(leads.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+    await appendAnalytics({
+      id: crypto.randomUUID(),
+      type: "admin_test_email_sent",
+      leadId: lead.id,
+      emailHash: crypto.createHash("sha256").update(lead.email).digest("hex").slice(0, 18),
+      subject,
+      messageId: delivery.messageId,
+      at: now,
+    });
+    return json(res, 200, { ok: true, lead: sanitizeLead(leads[index]), delivery });
+  } catch (error) {
+    logError("Admin test email failed", error, { leadId: lead.id });
+    await appendAnalytics({
+      id: crypto.randomUUID(),
+      type: "admin_test_email_failed",
+      leadId: lead.id,
+      emailHash: crypto.createHash("sha256").update(lead.email).digest("hex").slice(0, 18),
+      subject,
+      error: error.message || String(error),
+      at: new Date().toISOString(),
+    });
+    return json(res, 502, { ok: false, error: error.message || "Test email failed." });
+  }
+}
+
 async function handleAdminSubscriberUpdate(req, res) {
   const auth = requireAdminAuth(req, res);
   if (!auth.ok) return auth.response;
@@ -1787,6 +1968,7 @@ async function handleHealth(req, res) {
       webhookToken: Boolean(WEBHOOK_TOKEN),
       openRouter: Boolean(OPENROUTER_API_KEY),
       agenticAiLiveUpdate: Boolean(N8N_LIVE_WEBHOOK_URL),
+      email: mailConfigured(),
     },
     counts: {
       posts: items.length,
@@ -1876,6 +2058,10 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === "/api/admin/email-forward" && req.method === "POST") {
     return handleEmailForward(req, res);
+  }
+
+  if (url.pathname === "/api/admin/send-test-email" && req.method === "POST") {
+    return handleAdminSendTestEmail(req, res);
   }
 
   if (url.pathname === "/api/admin/subscriber" && req.method === "PATCH") {

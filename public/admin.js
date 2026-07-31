@@ -237,6 +237,7 @@ function renderRows() {
           <button type="button" data-toggle-paid="${escapeHtml(lead.id)}">${lead.plan === "paid-beta" ? "Mark free" : "Mark paid beta"}</button>
           <button type="button" data-toggle-paid-access="${escapeHtml(lead.id)}">${lead.paidAccessEnabled ? "Disable access" : "Enable access"}</button>
           <button type="button" data-generate-password="${escapeHtml(lead.id)}">Generate password</button>
+          <button type="button" class="save" data-send-test-email="${escapeHtml(lead.id)}">Send test email</button>
           <button type="button" class="save" data-save-paid-login="${escapeHtml(lead.id)}">Save paid login</button>
           <button type="button" class="save" data-save="${escapeHtml(lead.id)}">Save edits</button>
           <button type="button" class="danger" data-delete="${escapeHtml(lead.id)}">Delete</button>
@@ -288,6 +289,21 @@ async function recordForward(id) {
   });
   if (!response.ok) throw new Error("Could not record email forward.");
   await loadSummary();
+}
+
+async function sendTestEmail(id) {
+  const lead = leadById(id);
+  if (!lead) return;
+  adminStatus.textContent = `Sending test email to ${lead.email}...`;
+  const response = await fetch("/api/admin/send-test-email", {
+    method: "POST",
+    headers: { ...authHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || "Could not send test email.");
+  await loadSummary();
+  adminStatus.textContent = `Test email sent to ${lead.email}.`;
 }
 
 function leadById(id) {
@@ -414,11 +430,13 @@ rows.addEventListener("click", (event) => {
     target?.dataset?.togglePaid ||
     target?.dataset?.togglePaidAccess ||
     target?.dataset?.generatePassword ||
+    target?.dataset?.sendTestEmail ||
     target?.dataset?.savePaidLogin ||
     target?.dataset?.save ||
     target?.dataset?.delete;
   const forward = target?.dataset?.forward;
   if (forward) recordForward(forward).catch((error) => (adminStatus.textContent = error.message));
+  if (target?.dataset?.sendTestEmail) sendTestEmail(lead).catch((error) => (adminStatus.textContent = error.message));
   if (target?.dataset?.toggleSubscribe) {
     const current = leadById(lead);
     updateSubscriber(lead, { subscribed: !current.subscribed }).catch((error) => (adminStatus.textContent = error.message));

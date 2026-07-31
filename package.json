@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "node server.js",
     "mcp": "node mcp-server.mjs",
-    "mcp:http": "node mcp-server.mjs --http"
+    "mcp:http": "node mcp-server.mjs --http",
+    "test:chat-format": "node qa/chat-render-smoke.cjs"
   },
   "engines": {
     "node": ">=18"

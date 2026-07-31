@@ -1280,8 +1280,51 @@ body.chat-dock-open .chat-message {
 }
 
 .chat-message-body {
-  white-space: pre-wrap;
   line-height: 1.55;
+}
+
+.chat-message-body p {
+  margin: 0 0 10px;
+}
+
+.chat-message-body p:last-child {
+  margin-bottom: 0;
+}
+
+.chat-heading {
+  margin: 16px 0 6px;
+  color: var(--navy);
+  font-size: 0.94rem;
+  font-weight: 900;
+}
+
+.chat-message-body > .chat-heading:first-child {
+  margin-top: 0;
+}
+
+.chat-message-body ul,
+.chat-message-body ol {
+  margin: 6px 0 12px;
+  padding-left: 22px;
+}
+
+.chat-message-body li + li {
+  margin-top: 5px;
+}
+
+.chat-message-body blockquote {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--teal);
+  background: #f3fbfb;
+  color: #334155;
+}
+
+.chat-message-body code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #eef3f6;
+  font-size: 0.9em;
 }
 
 .chat-table-wrap {

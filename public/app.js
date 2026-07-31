@@ -374,24 +374,54 @@ function markdownTableToHtml(lines) {
   );
 
   return `<div class="chat-table-wrap"><table class="chat-table"><thead><tr>${header
-    .map((cell) => `<th>${escapeHtml(cell)}</th>`)
+    .map((cell) => `<th>${renderInlineMarkdown(cell)}</th>`)
     .join("")}</tr></thead><tbody>${rows
     .map(
       (row) =>
         `<tr>${header
-          .map((_, index) => `<td>${escapeHtml(row[index] || "")}</td>`)
+          .map((_, index) => `<td>${renderInlineMarkdown(row[index] || "")}</td>`)
           .join("")}</tr>`,
     )
     .join("")}</tbody></table></div>`;
 }
 
-function renderMarkdownTables(value) {
+function renderInlineMarkdown(value) {
+  let html = escapeHtml(value);
+  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+  html = html.replace(
+    /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+    '<a href="$2" target="_blank" rel="noreferrer">$1</a>',
+  );
+  html = html.replace(
+    /\((https?:\/\/[^\s<)]+)\)/g,
+    '(<a href="$1" target="_blank" rel="noreferrer">$1</a>)',
+  );
+  html = html.replace(
+    /(^|[\s(])(https?:\/\/[^\s<)]+)/g,
+    '$1<a href="$2" target="_blank" rel="noreferrer">$2</a>',
+  );
+  html = html.replace(/(^|[^\w])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  return html;
+}
+
+function renderRichText(value) {
   const lines = stripMarkupNoise(value).split(/\r?\n/);
   const blocks = [];
+  let listType = "";
+
+  const closeList = () => {
+    if (!listType) return;
+    blocks.push(`</${listType}>`);
+    listType = "";
+  };
+
   for (let index = 0; index < lines.length; index += 1) {
-    const current = lines[index];
+    const current = lines[index].trim();
     const next = lines[index + 1];
-    if (current?.includes("|") && next && isMarkdownTableSeparator(next)) {
+
+    if (current.includes("|") && next && isMarkdownTableSeparator(next)) {
+      closeList();
       const tableLines = [current, next];
       index += 2;
       while (index < lines.length && lines[index].includes("|") && lines[index].trim()) {
@@ -400,28 +430,48 @@ function renderMarkdownTables(value) {
       }
       index -= 1;
       blocks.push(markdownTableToHtml(tableLines));
+      continue;
+    }
+
+    if (!current) {
+      closeList();
+      continue;
+    }
+
+    const heading = current.match(/^(#{1,6})\s*(.*)$/);
+    if (heading && heading[2]) {
+      closeList();
+      blocks.push(`<div class="chat-heading">${renderInlineMarkdown(heading[2])}</div>`);
+      continue;
+    }
+    if (heading) {
+      closeList();
+      continue;
+    }
+
+    const unordered = current.match(/^[-*]\s+(.+)$/);
+    const ordered = current.match(/^\d+[.)]\s+(.+)$/);
+    if (unordered || ordered) {
+      const nextType = unordered ? "ul" : "ol";
+      if (listType !== nextType) {
+        closeList();
+        listType = nextType;
+        blocks.push(`<${listType}>`);
+      }
+      blocks.push(`<li>${renderInlineMarkdown((unordered || ordered)[1])}</li>`);
+      continue;
+    }
+
+    closeList();
+    if (/^>\s?/.test(current)) {
+      blocks.push(`<blockquote>${renderInlineMarkdown(current.replace(/^>\s?/, ""))}</blockquote>`);
     } else {
-      blocks.push(escapeHtml(current));
+      blocks.push(`<p>${renderInlineMarkdown(current)}</p>`);
     }
   }
-  return blocks.join("\n");
-}
 
-function renderRichText(value) {
-  let html = renderMarkdownTables(value);
-  html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(
-    /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
-    '<a href="$2" target="_blank" rel="noreferrer">$1</a>',
-  );
-  html = html.replace(
-    /(^|[\s(])(https?:\/\/[^\s<)]+)/g,
-    '$1<a href="$2" target="_blank" rel="noreferrer">$2</a>',
-  );
-  html = html.replace(/^### (.+)$/gm, "<strong>$1</strong>");
-  html = html.replace(/^\d+\.\s+/gm, "");
-  html = html.replace(/^- /gm, "- ");
-  return html;
+  closeList();
+  return blocks.join("");
 }
 
 function renderTags(item) {
@@ -1119,7 +1169,7 @@ function exportChatHtml() {
         .join("");
       return `<section class="message ${message.role}">
         <h2>${message.role === "user" ? "You" : "AI SignalDesk Copilot"}</h2>
-        <div>${renderRichText(message.content).replace(/\n/g, "<br>")}</div>
+        <div>${renderRichText(message.content)}</div>
         ${sources ? `<ul>${sources}</ul>` : ""}
       </section>`;
     })

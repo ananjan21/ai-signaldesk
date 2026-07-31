@@ -1320,6 +1320,155 @@ function addCategoryCount(bucket, category, amount = 1) {
   bucket.categories[safeCategory] = (bucket.categories[safeCategory] || 0) + amount;
 }
 
+const TREND_STOP_WORDS = new Set([
+  "about",
+  "after",
+  "and",
+  "agent",
+  "agentic",
+  "ai",
+  "also",
+  "analysis",
+  "based",
+  "build",
+  "data",
+  "daily",
+  "developer",
+  "engineer",
+  "engineering",
+  "from",
+  "global",
+  "have",
+  "into",
+  "latest",
+  "launch",
+  "machine",
+  "model",
+  "news",
+  "opportunity",
+  "platform",
+  "product",
+  "remote",
+  "research",
+  "signal",
+  "signals",
+  "software",
+  "startup",
+  "system",
+  "team",
+  "today",
+  "tool",
+  "tools",
+  "trend",
+  "update",
+  "using",
+  "with",
+  "work",
+  "world",
+]);
+
+function normalizeTopicLabel(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/&[a-z]+;/g, " ")
+    .replace(/[^a-z0-9+#.\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function trendTokens(item) {
+  const text = [
+    item.title,
+    item.summary,
+    item.company,
+    item.category,
+    ...(item.tags || []),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return text
+    .replace(/&[a-z]+;/g, " ")
+    .replace(/[^a-z0-9+#.\s-]/g, " ")
+    .split(/\s+/)
+    .map((token) => token.replace(/^-+|-+$/g, ""))
+    .filter((token) => token.length > 2 && !TREND_STOP_WORDS.has(token) && !/^\d+$/.test(token));
+}
+
+function trendPhrases(item) {
+  const titleTokens = trendTokens({ title: item.title, summary: "", company: "", category: "", tags: [] });
+  const phrases = [];
+  for (let index = 0; index < titleTokens.length - 1; index += 1) {
+    phrases.push(`${titleTokens[index]} ${titleTokens[index + 1]}`);
+  }
+  for (const tag of item.tags || []) {
+    const label = normalizeTopicLabel(tag);
+    if (label && label.length > 2 && !TREND_STOP_WORDS.has(label)) phrases.push(label);
+  }
+  return phrases.filter((phrase) => phrase.split(" ").some((part) => !TREND_STOP_WORDS.has(part)));
+}
+
+function buildTrendingTopics(items = []) {
+  const topics = new Map();
+  function recordTopic(rawTopic, item, score) {
+    const topicKey = normalizeTopicLabel(rawTopic);
+    if (!topicKey || topicKey.length < 3) return;
+    const current = topics.get(topicKey) || {
+      topic: topicKey,
+      count: 0,
+      score: 0,
+      categories: {},
+      examples: [],
+    };
+    current.count += 1;
+    current.score += score;
+    current.categories[canonicalCategory(item.category)] = (current.categories[canonicalCategory(item.category)] || 0) + 1;
+    if (current.examples.length < 3) current.examples.push({ title: item.title, category: canonicalCategory(item.category), link: item.link || "" });
+    topics.set(topicKey, current);
+  }
+
+  for (const item of items) {
+    const baseScore = Math.max(1, Number(item.fitScore || 50) / 25);
+    for (const phrase of new Set(trendPhrases(item))) recordTopic(phrase, item, baseScore * 1.8);
+    for (const token of new Set(trendTokens(item))) recordTopic(token, item, baseScore);
+  }
+  return Array.from(topics.values())
+    .map((topic) => ({
+      ...topic,
+      label: topic.topic.replace(/\b\w/g, (char) => char.toUpperCase()),
+      score: Math.round(topic.score * 10) / 10,
+      leadingCategory: Object.entries(topic.categories).sort((a, b) => b[1] - a[1])[0]?.[0] || "Signals",
+    }))
+    .sort((a, b) => b.score - a.score || b.count - a.count || a.topic.localeCompare(b.topic))
+    .slice(0, 8);
+}
+
+function buildTrendingItems(items = []) {
+  const now = Date.now();
+  return [...items]
+    .map((item) => {
+      const date = parseDate(item.publishedAt || item.receivedAt || item.updatedAt || item.createdAt);
+      const ageHours = date ? Math.max(1, (now - date.getTime()) / 36e5) : 72;
+      const recencyBoost = Math.max(0, 32 - ageHours) / 32;
+      const fitScore = Number(item.fitScore || 50);
+      const trendScore = Math.round(fitScore * 0.74 + recencyBoost * 26);
+      return {
+        id: item.id,
+        title: item.title,
+        category: canonicalCategory(item.category),
+        company: item.company,
+        summary: item.summary,
+        link: item.link || `/post/${item.id}`,
+        source: item.source || item.company || canonicalCategory(item.category),
+        fitScore,
+        trendScore,
+        publishedAt: item.publishedAt,
+        tags: (item.tags || []).slice(0, 4),
+      };
+    })
+    .sort((a, b) => b.trendScore - a.trendScore || new Date(b.publishedAt) - new Date(a.publishedAt))
+    .slice(0, 6);
+}
+
 function buildTrendSeries(items = [], analytics = []) {
   const now = new Date();
   const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
@@ -1370,6 +1519,8 @@ function buildTrendSeries(items = [], analytics = []) {
     monthly,
     activity,
     categoryTotals,
+    trendingTopics: buildTrendingTopics(items),
+    trendingItems: buildTrendingItems(items),
     topCategories: Object.entries(categoryTotals)
       .map(([category, total]) => ({ category, total }))
       .sort((a, b) => b.total - a.total)

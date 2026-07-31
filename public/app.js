@@ -877,16 +877,65 @@ function renderTopCategories(categories = []) {
   }
 }
 
+function renderTrendingTopics(container, topics = []) {
+  if (!container) return;
+  container.replaceChildren();
+  if (!topics.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No topics are trending yet.";
+    container.append(empty);
+    return;
+  }
+  for (const topic of topics.slice(0, 8)) {
+    const row = document.createElement("article");
+    row.className = "trend-topic";
+    const label = document.createElement("strong");
+    label.textContent = topic.label || topic.topic || "Topic";
+    const meta = document.createElement("span");
+    meta.textContent = `${Number(topic.count || 0)} signals / ${topic.leadingCategory || "Signals"}`;
+    const examples = document.createElement("p");
+    examples.textContent = (topic.examples || []).map((item) => item.title).filter(Boolean).slice(0, 2).join(" | ");
+    row.append(label, meta, examples);
+    container.append(row);
+  }
+}
+
+function renderTrendingTitles(container, items = []) {
+  if (!container) return;
+  container.replaceChildren();
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No ranked titles yet.";
+    container.append(empty);
+    return;
+  }
+  for (const item of items.slice(0, 6)) {
+    const row = document.createElement("article");
+    row.className = "trend-title";
+    const score = document.createElement("span");
+    score.textContent = Number(item.trendScore || item.fitScore || 0);
+    const body = document.createElement("div");
+    const link = document.createElement("a");
+    link.href = item.link || `/post/${item.id}`;
+    link.textContent = item.title || "Untitled signal";
+    const meta = document.createElement("small");
+    meta.textContent = `${item.category || "Signal"} / ${item.company || item.source || "Source"}`;
+    body.append(link, meta);
+    row.append(score, body);
+    container.append(row);
+  }
+}
+
 function renderTrendPanel() {
   const trends = state.trends || {};
-  renderTrendBars(dashboardWeeklyTrend, trends.weekly || []);
-  renderTrendBars(dashboardMonthlyTrend, trends.monthly || []);
+  renderTrendingTopics(dashboardWeeklyTrend, trends.trendingTopics || []);
+  renderTrendingTitles(dashboardMonthlyTrend, trends.trendingItems || []);
   renderTopCategories(trends.topCategories || []);
   const weeklyTotal = document.querySelector("#dashboardWeeklyTotal");
   const monthlyTotal = document.querySelector("#dashboardMonthlyTotal");
   const updated = document.querySelector("#dashboardTrendUpdated");
-  if (weeklyTotal) weeklyTotal.textContent = `${trendTotal(trends.weekly || [])} signals`;
-  if (monthlyTotal) monthlyTotal.textContent = `${trendTotal(trends.monthly || [])} signals`;
+  if (weeklyTotal) weeklyTotal.textContent = `${(trends.trendingTopics || []).length} topics`;
+  if (monthlyTotal) monthlyTotal.textContent = `${(trends.trendingItems || []).length} ranked`;
   if (updated) updated.textContent = trends.generatedAt ? formatDate(trends.generatedAt) : "Waiting";
 }
 

@@ -107,12 +107,56 @@ function renderTrendBars(container, series = []) {
   }
 }
 
+function renderTrendingTopics(container, topics = []) {
+  if (!container) return;
+  container.replaceChildren();
+  if (!topics.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No topics are trending yet.";
+    container.append(empty);
+    return;
+  }
+  for (const topic of topics.slice(0, 6)) {
+    const row = document.createElement("article");
+    row.className = "trend-topic";
+    row.innerHTML = `
+      <strong>${escapeHtml(topic.label || topic.topic || "Topic")}</strong>
+      <span>${Number(topic.count || 0)} signals / ${escapeHtml(topic.leadingCategory || "Signals")}</span>
+      <p>${escapeHtml((topic.examples || []).map((item) => item.title).filter(Boolean).slice(0, 2).join(" | "))}</p>
+    `;
+    container.append(row);
+  }
+}
+
+function renderTrendingTitles(container, items = []) {
+  if (!container) return;
+  container.replaceChildren();
+  if (!items.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No ranked titles yet.";
+    container.append(empty);
+    return;
+  }
+  for (const item of items.slice(0, 5)) {
+    const row = document.createElement("article");
+    row.className = "trend-title";
+    row.innerHTML = `
+      <span>${Number(item.trendScore || item.fitScore || 0)}</span>
+      <div>
+        <a href="${escapeHtml(item.link || `/post/${item.id}`)}" target="_blank" rel="noreferrer">${escapeHtml(item.title || "Untitled signal")}</a>
+        <small>${escapeHtml(item.category || "Signal")} / ${escapeHtml(item.company || item.source || "Source")}</small>
+      </div>
+    `;
+    container.append(row);
+  }
+}
+
 function renderAdminTrends() {
   const trends = state.summary?.trends || {};
-  renderTrendBars(document.querySelector("#adminWeeklyTrend"), trends.weekly || []);
-  renderTrendBars(document.querySelector("#adminMonthlyTrend"), trends.monthly || []);
-  document.querySelector("#adminWeeklyTotal").textContent = `${trendTotal(trends.weekly || [])} signals`;
-  document.querySelector("#adminMonthlyTotal").textContent = `${trendTotal(trends.monthly || [])} signals`;
+  renderTrendingTopics(document.querySelector("#adminWeeklyTrend"), trends.trendingTopics || []);
+  renderTrendingTitles(document.querySelector("#adminMonthlyTrend"), trends.trendingItems || []);
+  document.querySelector("#adminWeeklyTotal").textContent = `${(trends.trendingTopics || []).length} topics`;
+  document.querySelector("#adminMonthlyTotal").textContent = `${(trends.trendingItems || []).length} ranked`;
   const storage = trends.storage || {};
   document.querySelector("#adminStorageTotal").textContent = `${Number(storage.estimatedMonthlyMb || 0)} MB/mo`;
   document.querySelector("#adminStorageTrend").innerHTML = `

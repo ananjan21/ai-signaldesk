@@ -1111,6 +1111,25 @@ async function handleLiveUpdate(req, res) {
     });
   }
 
+  if (response.ok && payload?.ok) {
+    await appendAnalytics({
+      id: crypto.randomUUID(),
+      type: "live_update_success",
+      provider: "agentic-ai",
+      received: Number(payload.received || 0),
+      total: Number(payload.total || 0),
+      at: new Date().toISOString(),
+    });
+    return json(res, 202, {
+      ok: true,
+      status: response.status,
+      provider: "agentic-ai",
+      message: "Live update finished and the agentic AI workflow published fresh data.",
+      received: Number(payload.received || 0),
+      total: Number(payload.total || 0),
+    });
+  }
+
   const fallback = await fetchFallbackLiveSignals();
   if (fallback.items.length) {
     const saved = await saveIncomingItems(fallback.items, "live_update_fallback_success", {

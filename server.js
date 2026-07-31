@@ -1336,6 +1336,7 @@ const TREND_STOP_WORDS = new Set([
   "developer",
   "engineer",
   "engineering",
+  "for",
   "from",
   "global",
   "have",
@@ -1356,6 +1357,9 @@ const TREND_STOP_WORDS = new Set([
   "startup",
   "system",
   "team",
+  "the",
+  "their",
+  "this",
   "today",
   "tool",
   "tools",
@@ -1365,6 +1369,7 @@ const TREND_STOP_WORDS = new Set([
   "with",
   "work",
   "world",
+  "your",
 ]);
 
 function normalizeTopicLabel(value) {

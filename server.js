@@ -1180,8 +1180,14 @@ async function sendN8nEmail({ to, subject, html, text }) {
     } catch {
       payload = { response: responseText.slice(0, 1000) };
     }
-    if (!response.ok || payload?.ok === false) {
-      const error = new Error(payload?.error || payload?.message || `n8n email webhook failed with ${response.status}`);
+    if (!response.ok || payload?.ok !== true) {
+      const error = new Error(
+        payload?.error ||
+          payload?.message ||
+          (responseText.trim()
+            ? `n8n email webhook returned an unexpected response with status ${response.status}`
+            : `n8n email webhook returned an empty response with status ${response.status}`),
+      );
       error.status = response.status || 502;
       error.payload = payload;
       throw error;

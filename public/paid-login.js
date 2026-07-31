@@ -12,6 +12,38 @@ function escapeHtml(value = "") {
     .replaceAll("'", "&#39;");
 }
 
+function trendTotal(series = []) {
+  return series.reduce((sum, bucket) => sum + Number(bucket.total || 0), 0);
+}
+
+function renderTrendBars(container, series = []) {
+  if (!container) return;
+  container.replaceChildren();
+  const max = Math.max(1, ...series.map((bucket) => Number(bucket.total || 0)));
+  for (const bucket of series) {
+    const row = document.createElement("div");
+    row.className = "trend-row";
+    const label = document.createElement("span");
+    label.textContent = bucket.label || bucket.key || "-";
+    const track = document.createElement("span");
+    track.className = "trend-track";
+    const fill = document.createElement("i");
+    fill.style.width = `${Math.max(4, (Number(bucket.total || 0) / max) * 100)}%`;
+    track.append(fill);
+    const total = document.createElement("strong");
+    total.textContent = Number(bucket.total || 0);
+    row.append(label, track, total);
+    container.append(row);
+  }
+}
+
+function renderPaidTrends(trends = {}) {
+  renderTrendBars(document.querySelector("#paidWeeklyTrend"), trends.weekly || []);
+  renderTrendBars(document.querySelector("#paidMonthlyTrend"), trends.monthly || []);
+  document.querySelector("#paidWeeklyTotal").textContent = `${trendTotal(trends.weekly || [])} signals`;
+  document.querySelector("#paidMonthlyTotal").textContent = `${trendTotal(trends.monthly || [])} signals`;
+}
+
 function renderMember(data) {
   const profile = data.profile || {};
   document.querySelector("#memberTitle").textContent = `Welcome, ${profile.name || profile.paidUsername || "member"}`;
@@ -36,6 +68,7 @@ function renderMember(data) {
     .map((asset) => `<a href="${escapeHtml(asset.href)}" target="_blank" rel="noreferrer">${escapeHtml(asset.label)}</a>`)
     .join("");
 
+  renderPaidTrends(data.trends || {});
   paidLoginPanel.hidden = true;
   paidMemberPanel.hidden = false;
 }

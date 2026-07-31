@@ -19,6 +19,7 @@ const DATA_DIR = path.join(ROOT, "data");
 const DATA_FILE = path.join(DATA_DIR, "news.json");
 const LEADS_FILE = path.join(DATA_DIR, "leads.json");
 const ANALYTICS_FILE = path.join(DATA_DIR, "analytics.json");
+const ARCHIVE_DIR = path.join(DATA_DIR, "archive");
 const MAX_BODY_BYTES = Number(process.env.MAX_BODY_BYTES || 1024 * 1024);
 const MAX_POSTS_PER_REQUEST = Number(process.env.MAX_POSTS_PER_REQUEST || 50);
 const FUTURE_DATE_TOLERANCE_DAYS = Number(process.env.FUTURE_DATE_TOLERANCE_DAYS || 30);
@@ -40,6 +41,7 @@ const mimeTypes = {
 };
 
 const storageWriteQueues = new Map();
+let itemMergeQueue = Promise.resolve();
 
 function send(res, status, body, headers = {}) {
   res.writeHead(status, {
@@ -237,6 +239,7 @@ function canonicalCategory(value) {
 
 async function ensureStore() {
   await fs.mkdir(DATA_DIR, { recursive: true });
+  await fs.mkdir(ARCHIVE_DIR, { recursive: true });
   for (const file of [DATA_FILE, LEADS_FILE, ANALYTICS_FILE]) {
     try {
       await fs.access(file);
@@ -291,6 +294,53 @@ async function readItems() {
 
 async function writeItems(items) {
   await writeJsonArray(DATA_FILE, items);
+}
+
+function monthKey(value = new Date()) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return new Date().toISOString().slice(0, 7);
+  return date.toISOString().slice(0, 7);
+}
+
+function archiveFileFor(value = new Date()) {
+  return path.join(ARCHIVE_DIR, `${monthKey(value)}.json`);
+}
+
+async function appendMonthlyArchive(items, source = "publish") {
+  if (!items.length) return { month: monthKey(), saved: 0, total: 0 };
+  const file = archiveFileFor(new Date());
+  try {
+    await fs.access(file);
+  } catch {
+    await fs.writeFile(file, "[]\n", "utf8");
+  }
+  const archive = await readJsonArray(file, "Monthly archive");
+  const byId = new Map(archive.map((item) => [item.id, item]));
+  const archivedAt = new Date().toISOString();
+  for (const item of items) {
+    byId.set(item.id, {
+      ...sanitizeStoredItem(item),
+      archiveSource: source,
+      archivedAt,
+    });
+  }
+  const next = Array.from(byId.values()).sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+  await writeJsonArray(file, next);
+  return { month: monthKey(), saved: items.length, total: next.length };
+}
+
+async function mergeAndStoreItems(normalized, archiveSource = "publish") {
+  const run = itemMergeQueue.catch(() => {}).then(async () => {
+    const existing = await readItems();
+    const byId = new Map(existing.map((item) => [item.id, item]));
+    for (const item of normalized) byId.set(item.id, item);
+    const next = Array.from(byId.values()).sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+    await writeItems(next);
+    const archive = await appendMonthlyArchive(normalized, archiveSource);
+    return { next, total: next.length, archive };
+  });
+  itemMergeQueue = run.catch(() => {});
+  return run;
 }
 
 async function readLeads() {
@@ -603,20 +653,17 @@ async function saveIncomingItems(incoming, analyticsType, analyticsMeta = {}) {
     .filter((result) => result.errors.length);
   if (validationErrors.length) return { ok: false, validationErrors };
 
-  const existing = await readItems();
-  const byId = new Map(existing.map((item) => [item.id, item]));
-  for (const item of normalized) byId.set(item.id, item);
-  const next = Array.from(byId.values()).sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-  await writeItems(next);
+  const saved = await mergeAndStoreItems(normalized, analyticsType);
   await appendAnalytics({
     id: crypto.randomUUID(),
     type: analyticsType,
     received: normalized.length,
-    total: next.length,
+    total: saved.total,
+    archive: saved.archive,
     at: new Date().toISOString(),
     ...analyticsMeta,
   });
-  return { ok: true, normalized, total: next.length };
+  return { ok: true, normalized, total: saved.total, archive: saved.archive };
 }
 
 function sanitizeStoredItem(item) {
@@ -1193,21 +1240,18 @@ async function handleWebhook(req, res) {
   if (validationErrors.length) {
     return json(res, 422, { ok: false, error: "One or more posts are invalid.", validationErrors });
   }
-  const existing = await readItems();
-  const byId = new Map(existing.map((item) => [item.id, item]));
-  for (const item of normalized) byId.set(item.id, item);
-  const next = Array.from(byId.values()).sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
-  await writeItems(next);
+  const saved = await mergeAndStoreItems(normalized, "webhook_publish_success");
   await appendAnalytics({
     id: crypto.randomUUID(),
     type: "webhook_publish_success",
     received: normalized.length,
-    total: next.length,
+    total: saved.total,
+    archive: saved.archive,
     authorized: Boolean(WEBHOOK_TOKEN),
     at: new Date().toISOString(),
   });
 
-  return json(res, 201, { ok: true, received: normalized.length, total: next.length });
+  return json(res, 201, { ok: true, received: normalized.length, total: saved.total, archive: saved.archive });
 }
 
 function csvCell(value) {
@@ -1248,6 +1292,100 @@ function leadsToCsv(leads) {
   return `${headers.join(",")}\n${rows.join("\n")}\n`;
 }
 
+function parseDate(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function dayKey(value) {
+  const date = parseDate(value) || new Date();
+  return date.toISOString().slice(0, 10);
+}
+
+function shortDayLabel(value) {
+  const date = parseDate(value);
+  if (!date) return "Today";
+  return new Intl.DateTimeFormat("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" }).format(date);
+}
+
+function shortMonthLabel(value) {
+  const date = parseDate(`${value}-01T00:00:00.000Z`);
+  if (!date) return value;
+  return new Intl.DateTimeFormat("en-US", { month: "short", year: "2-digit", timeZone: "UTC" }).format(date);
+}
+
+function addCategoryCount(bucket, category, amount = 1) {
+  const safeCategory = canonicalCategory(category);
+  bucket.total += amount;
+  bucket.categories[safeCategory] = (bucket.categories[safeCategory] || 0) + amount;
+}
+
+function buildTrendSeries(items = [], analytics = []) {
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const weekly = [];
+  const weeklyMap = new Map();
+  for (let offset = 6; offset >= 0; offset -= 1) {
+    const date = new Date(todayUtc - offset * 24 * 60 * 60 * 1000);
+    const key = dayKey(date);
+    const bucket = { key, label: shortDayLabel(date), total: 0, categories: {} };
+    weekly.push(bucket);
+    weeklyMap.set(key, bucket);
+  }
+
+  const monthly = [];
+  const monthlyMap = new Map();
+  for (let offset = 5; offset >= 0; offset -= 1) {
+    const date = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1));
+    const key = monthKey(date);
+    const bucket = { key, label: shortMonthLabel(key), total: 0, categories: {} };
+    monthly.push(bucket);
+    monthlyMap.set(key, bucket);
+  }
+
+  const categoryTotals = {};
+  for (const item of items) {
+    const category = canonicalCategory(item.category);
+    const date = parseDate(item.receivedAt || item.publishedAt || item.updatedAt || item.createdAt) || now;
+    categoryTotals[category] = (categoryTotals[category] || 0) + 1;
+    if (weeklyMap.has(dayKey(date))) addCategoryCount(weeklyMap.get(dayKey(date)), category);
+    if (monthlyMap.has(monthKey(date))) addCategoryCount(monthlyMap.get(monthKey(date)), category);
+  }
+
+  const activity = weekly.map((bucket) => ({
+    key: bucket.key,
+    label: bucket.label,
+    total: analytics.filter((event) => dayKey(event.at) === bucket.key).length,
+  }));
+  const rawBytes = Buffer.byteLength(JSON.stringify(items), "utf8");
+  const averageItemBytes = Math.round(rawBytes / Math.max(1, items.length));
+  const weeklyTotal = weekly.reduce((sum, bucket) => sum + bucket.total, 0);
+  const activeDays = weekly.filter((bucket) => bucket.total > 0).length || 7;
+  const estimatedDailyPosts = Math.max(1, Math.ceil(weeklyTotal / activeDays));
+  const estimatedMonthlyBytes = estimatedDailyPosts * 30 * Math.max(averageItemBytes, 800);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    weekly,
+    monthly,
+    activity,
+    categoryTotals,
+    topCategories: Object.entries(categoryTotals)
+      .map(([category, total]) => ({ category, total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6),
+    storage: {
+      currentPosts: items.length,
+      currentBytes: rawBytes,
+      averageItemBytes,
+      estimatedDailyPosts,
+      estimatedMonthlyBytes,
+      estimatedMonthlyMb: Number((estimatedMonthlyBytes / 1024 / 1024).toFixed(3)),
+      archivePath: "data/archive/YYYY-MM.json",
+    },
+  };
+}
+
 function adminSummary({ leads, analytics, items }) {
   const sanitizedLeads = leads.map(sanitizeLead);
   const activeSubscribers = sanitizedLeads.filter((lead) => lead.subscribed);
@@ -1278,6 +1416,7 @@ function adminSummary({ leads, analytics, items }) {
       };
     }),
     recentAnalytics: analytics.slice(0, 50),
+    trends: buildTrendSeries(items, analytics),
     checkedAt: new Date().toISOString(),
   };
 }
@@ -1413,6 +1552,7 @@ function paidBetaFeaturesFor(lead, items) {
       generatedAt: new Date().toISOString(),
       items: sourceItems.map(compactChatItem),
     },
+    trends: buildTrendSeries(items, []),
     assets: [
       { label: "Daily digest", href: "/api/digest/daily.html" },
       { label: "Live dashboard", href: "/" },
@@ -1522,6 +1662,11 @@ async function handleApi(req, res, url) {
 
   if ((url.pathname === "/api/news" || url.pathname === "/api/posts") && req.method === "GET") {
     return json(res, 200, { items: await readItems() });
+  }
+
+  if (url.pathname === "/api/trends" && req.method === "GET") {
+    const [items, analytics] = await Promise.all([readItems(), readAnalytics()]);
+    return json(res, 200, { ok: true, ...buildTrendSeries(items, analytics) });
   }
 
   if (

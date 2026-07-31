@@ -39,6 +39,9 @@ const digestEmptyState = document.querySelector("#digestEmptyState");
 const syncState = document.querySelector("#syncState");
 const syncStateMessage = document.querySelector("#syncStateMessage");
 const chatSetupState = document.querySelector("#chatSetupState");
+const dashboardWeeklyTrend = document.querySelector("#dashboardWeeklyTrend");
+const dashboardMonthlyTrend = document.querySelector("#dashboardMonthlyTrend");
+const dashboardTopCategories = document.querySelector("#dashboardTopCategories");
 
 function trackEvent(type, payload = {}) {
   fetch("/api/analytics", {
@@ -54,6 +57,7 @@ function trackEvent(type, payload = {}) {
 
 const state = {
   items: [],
+  trends: null,
   query: "",
   category: "all",
   fit: "all",
@@ -734,6 +738,7 @@ function render() {
   digestEmptyState.hidden = hasSourceItems;
   updateMetrics(items);
   updateTicker();
+  renderTrendPanel();
   renderSpotlight(items);
   feed.replaceChildren();
 
@@ -831,10 +836,64 @@ function updateTicker() {
     : "AI jobs, papers, grants, tools, and funding signals refresh every day at 7:00 AM.";
 }
 
+function trendTotal(series = []) {
+  return series.reduce((sum, bucket) => sum + Number(bucket.total || 0), 0);
+}
+
+function renderTrendBars(container, series = []) {
+  if (!container) return;
+  container.replaceChildren();
+  const max = Math.max(1, ...series.map((bucket) => Number(bucket.total || 0)));
+  for (const bucket of series) {
+    const row = document.createElement("div");
+    row.className = "trend-row";
+    const label = document.createElement("span");
+    label.textContent = bucket.label || bucket.key || "-";
+    const track = document.createElement("span");
+    track.className = "trend-track";
+    const fill = document.createElement("i");
+    fill.style.width = `${Math.max(4, (Number(bucket.total || 0) / max) * 100)}%`;
+    track.append(fill);
+    const total = document.createElement("strong");
+    total.textContent = Number(bucket.total || 0);
+    row.append(label, track, total);
+    container.append(row);
+  }
+}
+
+function renderTopCategories(categories = []) {
+  if (!dashboardTopCategories) return;
+  dashboardTopCategories.replaceChildren();
+  if (!categories.length) {
+    const empty = document.createElement("p");
+    empty.textContent = "No category trend data yet.";
+    dashboardTopCategories.append(empty);
+    return;
+  }
+  for (const item of categories.slice(0, 6)) {
+    const chip = document.createElement("span");
+    chip.innerHTML = `<strong>${escapeHtml(item.category)}</strong><em>${Number(item.total || 0)}</em>`;
+    dashboardTopCategories.append(chip);
+  }
+}
+
+function renderTrendPanel() {
+  const trends = state.trends || {};
+  renderTrendBars(dashboardWeeklyTrend, trends.weekly || []);
+  renderTrendBars(dashboardMonthlyTrend, trends.monthly || []);
+  renderTopCategories(trends.topCategories || []);
+  const weeklyTotal = document.querySelector("#dashboardWeeklyTotal");
+  const monthlyTotal = document.querySelector("#dashboardMonthlyTotal");
+  const updated = document.querySelector("#dashboardTrendUpdated");
+  if (weeklyTotal) weeklyTotal.textContent = `${trendTotal(trends.weekly || [])} signals`;
+  if (monthlyTotal) monthlyTotal.textContent = `${trendTotal(trends.monthly || [])} signals`;
+  if (updated) updated.textContent = trends.generatedAt ? formatDate(trends.generatedAt) : "Waiting";
+}
+
 async function loadItems() {
   document.querySelector("#syncStatus").textContent = "Syncing";
   try {
-    const response = await fetch("/api/posts");
+    const [response, trendsResponse] = await Promise.all([fetch("/api/posts"), fetch("/api/trends")]);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Could not load the intelligence feed.");
     const items = Array.isArray(data.items) ? data.items : sampleItems;
@@ -842,12 +901,14 @@ async function loadItems() {
       ...item,
       category: canonicalCategory(item.category),
     }));
+    state.trends = trendsResponse.ok ? await trendsResponse.json() : null;
     populateCategories();
     render();
     syncState.hidden = true;
     document.querySelector("#syncStatus").textContent = "Live";
   } catch (error) {
     state.items = sampleItems;
+    state.trends = null;
     populateCategories();
     render();
     syncStateMessage.textContent = error.message || "Showing the latest available intelligence while the connection recovers.";

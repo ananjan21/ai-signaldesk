@@ -82,6 +82,47 @@ function renderMetrics() {
   document.querySelector("#metricLatest").textContent = formatDate(state.summary?.latestForward);
 }
 
+function trendTotal(series = []) {
+  return series.reduce((sum, bucket) => sum + Number(bucket.total || 0), 0);
+}
+
+function renderTrendBars(container, series = []) {
+  if (!container) return;
+  container.replaceChildren();
+  const max = Math.max(1, ...series.map((bucket) => Number(bucket.total || 0)));
+  for (const bucket of series) {
+    const row = document.createElement("div");
+    row.className = "trend-row";
+    const label = document.createElement("span");
+    label.textContent = bucket.label || bucket.key || "-";
+    const track = document.createElement("span");
+    track.className = "trend-track";
+    const fill = document.createElement("i");
+    fill.style.width = `${Math.max(4, (Number(bucket.total || 0) / max) * 100)}%`;
+    track.append(fill);
+    const total = document.createElement("strong");
+    total.textContent = Number(bucket.total || 0);
+    row.append(label, track, total);
+    container.append(row);
+  }
+}
+
+function renderAdminTrends() {
+  const trends = state.summary?.trends || {};
+  renderTrendBars(document.querySelector("#adminWeeklyTrend"), trends.weekly || []);
+  renderTrendBars(document.querySelector("#adminMonthlyTrend"), trends.monthly || []);
+  document.querySelector("#adminWeeklyTotal").textContent = `${trendTotal(trends.weekly || [])} signals`;
+  document.querySelector("#adminMonthlyTotal").textContent = `${trendTotal(trends.monthly || [])} signals`;
+  const storage = trends.storage || {};
+  document.querySelector("#adminStorageTotal").textContent = `${Number(storage.estimatedMonthlyMb || 0)} MB/mo`;
+  document.querySelector("#adminStorageTrend").innerHTML = `
+    <p><span>Current posts</span><strong>${Number(storage.currentPosts || 0)}</strong></p>
+    <p><span>Average item size</span><strong>${Number(storage.averageItemBytes || 0)} bytes</strong></p>
+    <p><span>Forecast volume</span><strong>${Number(storage.estimatedDailyPosts || 0)} posts/day</strong></p>
+    <p><span>Monthly archive</span><strong>${escapeHtml(storage.archivePath || "data/archive/YYYY-MM.json")}</strong></p>
+  `;
+}
+
 function renderRows() {
   const leads = filteredLeads();
   rows.replaceChildren();
@@ -170,6 +211,7 @@ async function loadSummary() {
   state.summary = data;
   state.leads = data.leads || [];
   renderMetrics();
+  renderAdminTrends();
   renderRows();
   adminStatus.textContent = `Updated ${formatDate(data.checkedAt)}`;
 }

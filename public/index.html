@@ -126,6 +126,36 @@
         </aside>
       </section>
 
+      <section class="trend-panel dashboard-trends" aria-label="Weekly and monthly AI signal trends">
+        <div class="section-heading">
+          <p class="eyebrow">Trend intelligence</p>
+          <h2>Weekly and monthly signal movement.</h2>
+        </div>
+        <div class="trend-grid">
+          <article class="trend-card">
+            <div class="trend-card-header">
+              <span>Weekly trending</span>
+              <strong id="dashboardWeeklyTotal">0 signals</strong>
+            </div>
+            <div id="dashboardWeeklyTrend" class="trend-bars" aria-label="Weekly signal trend plot"></div>
+          </article>
+          <article class="trend-card">
+            <div class="trend-card-header">
+              <span>Monthly trending</span>
+              <strong id="dashboardMonthlyTotal">0 signals</strong>
+            </div>
+            <div id="dashboardMonthlyTrend" class="trend-bars" aria-label="Monthly signal trend plot"></div>
+          </article>
+          <article class="trend-card trend-categories">
+            <div class="trend-card-header">
+              <span>Category momentum</span>
+              <strong id="dashboardTrendUpdated">Waiting</strong>
+            </div>
+            <div id="dashboardTopCategories" class="trend-category-list"></div>
+          </article>
+        </div>
+      </section>
+
       <section class="paid-beta-band" aria-label="Paid beta offer">
         <div class="digest-preview" aria-label="Preview of the Pro AI Opportunity Digest">
           <div class="digest-window-bar">

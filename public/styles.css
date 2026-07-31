@@ -3874,6 +3874,148 @@ body {
   margin-top: 0;
 }
 
+.trend-panel {
+  width: min(1180px, calc(100% - 40px));
+  margin: 28px auto;
+}
+
+.trend-panel .section-heading {
+  margin-bottom: 14px;
+}
+
+.trend-panel .section-heading h2 {
+  margin: 4px 0 0;
+  color: var(--brand-midnight);
+  font-size: clamp(1.2rem, 2vw, 1.75rem);
+  letter-spacing: 0;
+}
+
+.trend-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.trend-card {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(8, 25, 43, 0.07);
+}
+
+.trend-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.trend-card-header span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.trend-card-header strong {
+  color: var(--brand-midnight);
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.trend-bars {
+  display: grid;
+  gap: 10px;
+}
+
+.trend-row {
+  display: grid;
+  grid-template-columns: 78px minmax(90px, 1fr) 34px;
+  align-items: center;
+  gap: 10px;
+  min-height: 24px;
+}
+
+.trend-row span:first-child {
+  color: var(--muted);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+
+.trend-track {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(14, 83, 110, 0.1);
+}
+
+.trend-track i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--brand-teal), var(--brand-green));
+}
+
+.trend-row strong {
+  color: var(--brand-midnight);
+  font-size: 0.82rem;
+  text-align: right;
+}
+
+.trend-category-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.trend-category-list span,
+.trend-storage p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 9px 10px;
+  border: 1px solid rgba(14, 83, 110, 0.14);
+  border-radius: 8px;
+  background: #f7fbfa;
+}
+
+.trend-category-list strong,
+.trend-storage span {
+  color: var(--brand-midnight);
+  font-size: 0.78rem;
+}
+
+.trend-category-list em,
+.trend-storage strong {
+  color: var(--brand-teal);
+  font-size: 0.78rem;
+  font-style: normal;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.trend-storage {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-trends {
+  width: 100%;
+  margin: 22px 0;
+}
+
+.paid-trends {
+  gap: 18px;
+}
+
 @media (max-width: 590px) {
   .system-state-banner {
     align-items: flex-start;
@@ -3893,11 +4035,39 @@ body {
   .chat-setup-state img {
     width: 88px;
   }
+
+  .trend-panel {
+    width: calc(100% - 28px);
+    margin: 22px auto;
+  }
+
+  .trend-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trend-card {
+    padding: 14px;
+  }
+
+  .trend-card-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .trend-row {
+    grid-template-columns: 64px minmax(70px, 1fr) 28px;
+    gap: 8px;
+  }
 }
 
 @media (max-width: 1040px) {
   .intelligence-dashboard {
     background-position: 46% center;
+  }
+
+  .trend-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -3925,6 +4095,10 @@ body {
 
   .intelligence-dashboard .context-panel {
     backdrop-filter: none;
+  }
+
+  .trend-grid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -25,6 +25,7 @@ const exportChatButton = document.querySelector("#exportChatButton");
 const chatDockButton = document.querySelector("#chatDockButton");
 const closeChatDockButton = document.querySelector("#closeChatDockButton");
 const promptQueueList = document.querySelector("#promptQueueList");
+const promptQueue = document.querySelector(".prompt-queue");
 const clearQueueButton = document.querySelector("#clearQueueButton");
 const contextButtons = [...document.querySelectorAll(".category-snapshot button")];
 const briefingDate = document.querySelector("#briefingDate");
@@ -851,6 +852,7 @@ function renderChat() {
 
 function renderPromptQueue() {
   promptQueueList.replaceChildren();
+  promptQueue.classList.toggle("is-empty", !state.promptQueue.length && !state.processingChat);
   if (!state.promptQueue.length) {
     const empty = document.createElement("p");
     empty.textContent = state.processingChat ? "Reply in progress..." : "Queue is empty";

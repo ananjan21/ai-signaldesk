@@ -382,22 +382,24 @@
       </section>
 
       <section class="assistant-console" id="aiChat">
-        <div class="assistant-info">
-          <p class="eyebrow">AI assistant</p>
-          <h2>Ask the desk about today&apos;s opportunities.</h2>
-          <p>
-            The chatbot reads the current local feed and helps compare jobs, papers, startup signals,
-            fit scores, source links, and next actions.
-          </p>
-        </div>
-        <div class="chat-panel">
-          <div class="chat-toolbar" aria-label="Chat actions">
-            <span>Opportunity copilot</span>
+        <header class="assistant-header">
+          <div class="assistant-identity">
+            <span class="assistant-mark" aria-hidden="true">AI</span>
             <div>
-              <button id="exportChatButton" type="button">Export HTML</button>
-              <button id="closeChatDockButton" class="chat-dock-close" type="button" aria-label="Close chat">Close</button>
+              <p class="eyebrow">Opportunity copilot</p>
+              <h2>Ask the desk about today&apos;s opportunities.</h2>
+              <p class="assistant-summary">Compare signals, inspect sources, and turn the strongest opportunity into an action.</p>
             </div>
           </div>
+          <div class="assistant-actions">
+            <p id="chatStatus" class="form-status" aria-live="polite"></p>
+            <div class="chat-toolbar" aria-label="Chat actions">
+              <button id="exportChatButton" type="button" title="Export conversation as HTML">Export</button>
+              <button id="closeChatDockButton" class="chat-dock-close" type="button" aria-label="Close chat" title="Close chat">&#215;</button>
+            </div>
+          </div>
+        </header>
+        <div class="chat-panel">
           <div id="chatSetupState" class="product-state chat-setup-state" hidden>
             <img
               src="/assets/states/state-chat-setup.webp"
@@ -429,7 +431,6 @@
             />
             <button id="chatSendButton" type="submit">Send</button>
           </form>
-          <p id="chatStatus" class="form-status" aria-live="polite"></p>
         </div>
       </section>
 

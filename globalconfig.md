@@ -1,173 +1,209 @@
-# AI SignalDesk Global Config
+# Global VPS App Connector Config
 
-Reusable configuration reference for moving AI SignalDesk access patterns into another VPS app.
+Use this as a simple reusable template for any new VPS app that needs:
 
-Do not store real secrets in this file. Keep actual values in the target VPS `.env`, secret manager, or connector credential store.
+- OpenRouter API for AI chat
+- A protected API/webhook for external automation
+- An optional MCP server for ChatGPT, Claude, Cursor, Codex, or other MCP clients
+- Optional public asset access
 
-## App Identity
+Do not put real secrets in this file. Keep real values in `.env`, the VPS provider environment panel, or a secret manager.
 
-| Setting | Value |
-|---|---|
-| Product name | AI SignalDesk |
-| Docker project name | ai-signaldesk |
-| Web container | ai-signaldesk-web |
-| MCP container | ai-signaldesk-mcp |
-| Public app URL | https://signaldesk.ailabworks.tech |
-| VPS project path | /docker/ai-signaldesk/docker-compose.yml |
-| Hostinger VPS project | ai-signaldesk |
-| Hostinger VM ID | 1800336 |
+## Replace These Placeholders
 
-## Core Ports
+| Placeholder | Meaning | Example |
+|---|---|---|
+| `<APP_NAME>` | Human-readable app name | My Dashboard |
+| `<APP_SLUG>` | Lowercase Docker/project name | my-dashboard |
+| `<APP_DOMAIN>` | Public HTTPS domain | app.example.com |
+| `<APP_PUBLIC_URL>` | Full public URL | https://app.example.com |
+| `<WEB_PORT>` | Web app port | 4173 |
+| `<MCP_PORT>` | MCP server port | 4174 |
+| `<MCP_SERVER_LABEL>` | MCP connector label | my-dashboard |
 
-| Service | Internal port | Default public port | Purpose |
-|---|---:|---:|---|
-| Web app/API | 4173 | 4173 | Dashboard, REST API, admin, paid beta |
-| MCP HTTP server | 4174 | 4174 | Remote MCP connector endpoint |
-
-## Production Environment Template
-
-Use this as the base `.env` for another VPS app. Replace every placeholder with a secret generated for that app.
+## Basic Production `.env`
 
 ```env
-COMPOSE_PROJECT_NAME=ai-signaldesk
+COMPOSE_PROJECT_NAME=<APP_SLUG>
 
 NODE_ENV=production
-PORT=4173
-WEB_PORT=4173
-
-AI_SIGNALDESK_PUBLIC_URL=https://signaldesk.ailabworks.tech
+PORT=<WEB_PORT>
+WEB_PORT=<WEB_PORT>
+APP_PUBLIC_URL=<APP_PUBLIC_URL>
 
 WEBHOOK_TOKEN=<set-long-random-webhook-token>
 ADMIN_USERNAME=<set-admin-username>
 ADMIN_PASSWORD=<set-admin-password>
 
-MCP_PORT=4174
+MCP_PORT=<MCP_PORT>
 MCP_HOST=0.0.0.0
-MCP_ALLOWED_HOSTS=signaldesk.ailabworks.tech,signaldesk.ailabworks.tech:443,signaldesk.ailabworks.tech:4174,localhost,127.0.0.1
+MCP_ALLOWED_HOSTS=<APP_DOMAIN>,<APP_DOMAIN>:443,<APP_DOMAIN>:<MCP_PORT>,localhost,127.0.0.1
 MCP_TOKEN=<set-long-random-mcp-token>
 
 OPENROUTER_API_KEY=<set-openrouter-api-key>
 OPENROUTER_MODEL=qwen/qwen3.7-flash
-OPENROUTER_SITE_URL=https://signaldesk.ailabworks.tech
-OPENROUTER_SITE_NAME=AI SignalDesk
+OPENROUTER_SITE_URL=<APP_PUBLIC_URL>
+OPENROUTER_SITE_NAME=<APP_NAME>
 
-N8N_LIVE_WEBHOOK_URL=<set-agentic-ai-live-update-webhook-url>
-N8N_LIVE_WEBHOOK_TOKEN=<set-agentic-ai-live-update-token-or-empty>
+LIVE_WEBHOOK_URL=<set-external-automation-webhook-url-or-empty>
+LIVE_WEBHOOK_TOKEN=<set-external-automation-token-or-empty>
 
 MAX_BODY_BYTES=1048576
 MAX_POSTS_PER_REQUEST=50
-FUTURE_DATE_TOLERANCE_DAYS=30
 RATE_LIMIT_WINDOW_MS=900000
 LIVE_UPDATE_TIMEOUT_MS=25000
 ```
 
-## External API: OpenRouter Chat
+## OpenRouter API Setup
 
-| Item | Config |
+OpenRouter is used server-side for AI chat. The browser should call your own backend endpoint, and your backend should call OpenRouter. Never expose `OPENROUTER_API_KEY` in frontend JavaScript.
+
+| Item | Value |
 |---|---|
-| API endpoint | https://openrouter.ai/api/v1/chat/completions |
-| Required env | `OPENROUTER_API_KEY` |
+| API endpoint | `https://openrouter.ai/api/v1/chat/completions` |
+| Required key env | `OPENROUTER_API_KEY` |
 | Model env | `OPENROUTER_MODEL` |
-| Current Docker default | `qwen/qwen3.7-flash` |
-| Local app fallback default | `google/gemini-3.5-flash-lite` |
-| Referer header | `HTTP-Referer: ${OPENROUTER_SITE_URL}` |
-| Title header | `X-OpenRouter-Title: ${OPENROUTER_SITE_NAME}` |
-| Browser exposure | Never expose the API key to frontend JavaScript |
+| Recommended low-cost model | `qwen/qwen3.7-flash` |
+| Alternative low-cost model | `google/gemini-3.5-flash-lite` |
+| Site URL header | `HTTP-Referer: <APP_PUBLIC_URL>` |
+| Site name header | `X-OpenRouter-Title: <APP_NAME>` |
 
-Server-side request headers:
+Server request example:
 
 ```http
+POST https://openrouter.ai/api/v1/chat/completions
 Authorization: Bearer <OPENROUTER_API_KEY>
 Content-Type: application/json
-HTTP-Referer: <OPENROUTER_SITE_URL>
-X-OpenRouter-Title: <OPENROUTER_SITE_NAME>
+HTTP-Referer: <APP_PUBLIC_URL>
+X-OpenRouter-Title: <APP_NAME>
 ```
 
-## Agentic AI Live Update Connector
-
-The current code keeps legacy env names for compatibility, but public UI text should call this `agentic AI`.
-
-| Item | Config |
-|---|---|
-| Trigger env | `N8N_LIVE_WEBHOOK_URL` |
-| Optional auth env | `N8N_LIVE_WEBHOOK_TOKEN` |
-| App trigger endpoint | `POST /api/live-update` |
-| Outbound auth header | `x-live-update-token: <N8N_LIVE_WEBHOOK_TOKEN>` |
-| Expected response | JSON array or `{ "items": [...] }` |
-| Fallback behavior | App can pull direct public sources if the live workflow returns no posts |
-
-Incoming item publication endpoint for external workflows:
-
-```http
-POST https://signaldesk.ailabworks.tech/api/posts/daily
-Authorization: Bearer <WEBHOOK_TOKEN>
-Content-Type: application/json
-```
-
-Accepted payload shapes:
-
-```json
-[
-  {
-    "title": "Signal title",
-    "summary": "Short clean summary",
-    "link": "https://source.example/item",
-    "category": "Research",
-    "fitScore": 88,
-    "publishedAt": "2026-07-31T00:00:00.000Z",
-    "tags": ["healthcare-ai", "paper"]
-  }
-]
-```
+Example body:
 
 ```json
 {
-  "items": [
+  "model": "qwen/qwen3.7-flash",
+  "temperature": 0.3,
+  "messages": [
     {
-      "title": "Signal title",
-      "summary": "Short clean summary",
-      "link": "https://source.example/item",
-      "category": "AI Products"
+      "role": "system",
+      "content": "You are a helpful assistant for this app. Answer using only the app data provided."
+    },
+    {
+      "role": "user",
+      "content": "Summarize today's top items."
     }
   ]
 }
 ```
 
-## MCP Connector
+Minimal Node.js example:
+
+```js
+async function callOpenRouter(messages) {
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": process.env.OPENROUTER_SITE_URL || process.env.APP_PUBLIC_URL,
+      "X-OpenRouter-Title": process.env.OPENROUTER_SITE_NAME || process.env.APP_NAME || "VPS App",
+    },
+    body: JSON.stringify({
+      model: process.env.OPENROUTER_MODEL || "qwen/qwen3.7-flash",
+      temperature: 0.3,
+      messages,
+    }),
+  });
+
+  if (!response.ok) throw new Error(`OpenRouter failed: ${response.status}`);
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
+}
+```
+
+## Protected Webhook/API Pattern
+
+Use this pattern when an external automation tool needs to publish data into your app.
+
+```http
+POST <APP_PUBLIC_URL>/api/items/daily
+Authorization: Bearer <WEBHOOK_TOKEN>
+Content-Type: application/json
+```
+
+Recommended payload shape:
+
+```json
+{
+  "items": [
+    {
+      "title": "Item title",
+      "summary": "Short clean summary",
+      "link": "https://source.example/item",
+      "category": "News",
+      "score": 88,
+      "publishedAt": "2026-07-31T00:00:00.000Z",
+      "tags": ["topic", "source"]
+    }
+  ]
+}
+```
+
+## Optional Live Update Connector
+
+Use this when your app has a button or scheduled job that triggers an external automation workflow.
+
+```env
+LIVE_WEBHOOK_URL=<external-workflow-url>
+LIVE_WEBHOOK_TOKEN=<optional-shared-token>
+```
+
+Backend request pattern:
+
+```http
+POST <LIVE_WEBHOOK_URL>
+Content-Type: application/json
+x-live-update-token: <LIVE_WEBHOOK_TOKEN>
+```
+
+Expected workflow response:
+
+```json
+{
+  "items": []
+}
+```
+
+## MCP Connector Setup
+
+Use MCP when you want ChatGPT, Claude, Cursor, Codex, or another client to access your app data and tools.
 
 Remote MCP endpoint:
 
 ```text
-https://signaldesk.ailabworks.tech/mcp
+<APP_PUBLIC_URL>/mcp
 ```
 
-Direct container endpoint if no reverse proxy maps `/mcp`:
+Direct VPS endpoint if no reverse proxy is configured:
 
 ```text
-http://<vps-host>:4174/mcp
+http://<VPS_HOST>:<MCP_PORT>/mcp
 ```
 
-Required MCP auth:
+MCP auth header:
 
 ```http
 Authorization: Bearer <MCP_TOKEN>
 ```
 
-Recommended allowed hosts for this deployment:
-
-```env
-MCP_ALLOWED_HOSTS=signaldesk.ailabworks.tech,signaldesk.ailabworks.tech:443,signaldesk.ailabworks.tech:4174,localhost,127.0.0.1
-```
-
-### ChatGPT / OpenAI Connector Option
-
-Use the remote MCP server URL after HTTPS and `/mcp` reverse proxy are active:
+### ChatGPT / OpenAI Remote MCP Example
 
 ```json
 {
   "type": "mcp",
-  "server_label": "ai-signaldesk",
-  "server_url": "https://signaldesk.ailabworks.tech/mcp",
+  "server_label": "<MCP_SERVER_LABEL>",
+  "server_url": "<APP_PUBLIC_URL>/mcp",
   "headers": {
     "Authorization": "Bearer <MCP_TOKEN>"
   },
@@ -175,20 +211,16 @@ Use the remote MCP server URL after HTTPS and `/mcp` reverse proxy are active:
 }
 ```
 
-If the client supports connector-level auth fields instead of raw headers, store `<MCP_TOKEN>` in that connector's secret/auth field.
-
-### Claude Desktop / Local MCP Option
-
-For a local stdio MCP client running from the app directory:
+### Claude Desktop Local MCP Example
 
 ```json
 {
   "mcpServers": {
-    "ai-signaldesk": {
+    "<MCP_SERVER_LABEL>": {
       "command": "node",
-      "args": ["H:\\n8nDailyRashi\\mcp-server.mjs"],
+      "args": ["<ABSOLUTE_PATH_TO_APP>/mcp-server.mjs"],
       "env": {
-        "AI_SIGNALDESK_PUBLIC_URL": "https://signaldesk.ailabworks.tech",
+        "APP_PUBLIC_URL": "<APP_PUBLIC_URL>",
         "MCP_TOKEN": "<MCP_TOKEN>"
       }
     }
@@ -196,126 +228,111 @@ For a local stdio MCP client running from the app directory:
 }
 ```
 
-For another VPS app, replace the `args` path with that app's absolute `mcp-server.mjs` path.
-
-### MCP Resources
-
-| Resource URI | Purpose |
-|---|---|
-| `ai-signaldesk://feed` | Current normalized opportunity feed |
-| `ai-signaldesk://digest/daily` | Daily digest payload with subject, text, HTML, counts, and compact items |
-| `ai-signaldesk://assets/manifest` | Public asset manifest with file paths and web URLs |
-
-### MCP Tools
+## MCP Tool Ideas For Any App
 
 | Tool | Purpose |
 |---|---|
-| `search_signals` | Search feed by keyword, category, score, and limit |
-| `get_top_opportunities` | Return highest-scoring current opportunities |
-| `get_daily_digest` | Return digest as JSON, HTML, or text |
-| `list_sources` | List configured source families and current feed domains |
-| `get_asset_manifest` | List public assets by group |
-| `get_asset` | Return metadata and optional base64 for one public asset |
-| `get_email_subscribers` | Return subscriber records; requires token argument |
-| `trigger_live_update` | Trigger app live update; requires token when configured |
+| `search_items` | Search app records by keyword, category, score, or date |
+| `get_top_items` | Return the highest priority records |
+| `get_daily_summary` | Return a compact daily summary |
+| `list_sources` | Show where current data came from |
+| `get_asset_manifest` | List available public assets |
+| `get_asset` | Return metadata or base64 for one asset |
+| `trigger_live_update` | Ask the app to refresh data through automation |
 
-## Asset Access
+## MCP Resource Ideas For Any App
 
-Public asset base URL:
+| Resource URI Pattern | Purpose |
+|---|---|
+| `<app>://feed` | Current app feed or records |
+| `<app>://summary/daily` | Daily summary payload |
+| `<app>://assets/manifest` | Public asset list |
+| `<app>://config/public` | Non-secret public app config |
+
+## Public Asset Access
+
+If the app has static assets, expose them through the web server and optionally through MCP.
+
+Public URL pattern:
 
 ```text
-https://signaldesk.ailabworks.tech/assets/
+<APP_PUBLIC_URL>/assets/<file-name>
 ```
 
-Useful asset paths:
+MCP asset access pattern:
 
 ```text
-/assets/categories/
-/assets/states/
-/assets/hero-ai-opportunity-radar.jpg
-/assets/hero-ai-opportunity-radar-mobile.jpg
-```
-
-MCP asset access:
-
-```text
-Resource: ai-signaldesk://assets/manifest
+Resource: <app>://assets/manifest
 Tool: get_asset_manifest
 Tool: get_asset
 ```
 
-For other VPS apps, prefer MCP asset URLs or public `/assets/...` URLs instead of copying binary files.
+Do not expose private files, `.env`, logs, uploads with personal data, or subscriber/user records as public assets.
 
-## REST API Endpoints
+## Generic REST Endpoints
 
 | Endpoint | Method | Auth | Purpose |
 |---|---|---|---|
-| `/api/health` | GET | none | Service health and configured feature flags |
-| `/api/posts` | GET | none | Current feed |
-| `/api/posts/daily` | POST | `WEBHOOK_TOKEN` when set | Publish workflow items |
-| `/api/trends` | GET | none | Trending topics, ranked titles, category totals, weekly/monthly buckets |
-| `/api/digest/daily` | GET | none | JSON daily digest |
-| `/api/digest/daily.html` | GET | none | HTML daily digest |
-| `/api/chat` | POST | server-side OpenRouter key | Feed-grounded AI chat |
-| `/api/subscribe` | POST | none | Lead signup |
-| `/api/admin/summary` | GET | Basic admin auth or webhook bearer | Subscriber/admin summary |
-| `/api/admin/subscriber` | PATCH/DELETE | Basic admin auth or webhook bearer | Update/delete subscribers |
-| `/api/admin/email-forward` | POST | Basic admin auth or webhook bearer | Record digest/email forward count |
-| `/api/leads.csv` | GET | Basic admin auth | CSV export |
-| `/api/live-update` | POST | rate-limited | Trigger agentic AI live update |
+| `/api/health` | GET | none | Health check |
+| `/api/items` | GET | optional | Current app records |
+| `/api/items/daily` | POST | `WEBHOOK_TOKEN` | Publish automation results |
+| `/api/trends` | GET | optional | Trending topics, ranked items, category totals |
+| `/api/chat` | POST | server-side OpenRouter key | AI chat grounded in app data |
+| `/api/subscribe` | POST | none or app auth | User signup |
+| `/api/admin/summary` | GET | admin auth | Admin dashboard data |
+| `/api/live-update` | POST | rate-limited | Trigger external automation |
 
-## Source Families Used By Feed Workflows
-
-These are source families represented by the bundled workflow/MCP source list. Individual live sources may vary by workflow version.
-
-```text
-Remotive
-Hacker News / Algolia
-OpenAlex
-GitHub
-DEV Community
-Hugging Face
-Semantic Scholar
-arXiv
-```
-
-## Docker Compose Service Pattern
+## Docker Compose Pattern
 
 ```yaml
-name: ai-signaldesk
+name: <APP_SLUG>
 
 services:
   web:
-    image: ai-signaldesk:latest
-    container_name: ai-signaldesk-web
+    build:
+      context: .
+    image: <APP_SLUG>:latest
+    container_name: <APP_SLUG>-web
     restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: <WEB_PORT>
+      WEBHOOK_TOKEN: ${WEBHOOK_TOKEN:?Set WEBHOOK_TOKEN}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-qwen/qwen3.7-flash}
+      OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-${APP_PUBLIC_URL}}
+      OPENROUTER_SITE_NAME: ${OPENROUTER_SITE_NAME:-VPS App}
     ports:
-      - "${WEB_PORT:-4173}:4173"
+      - "${WEB_PORT:-4173}:<WEB_PORT>"
     volumes:
       - ./data:/app/data
 
   mcp:
-    image: ai-signaldesk:latest
-    container_name: ai-signaldesk-mcp
+    image: <APP_SLUG>:latest
+    container_name: <APP_SLUG>-mcp
     restart: unless-stopped
     command: ["node", "mcp-server.mjs", "--http"]
+    environment:
+      MCP_PORT: <MCP_PORT>
+      MCP_HOST: 0.0.0.0
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      MCP_TOKEN: ${MCP_TOKEN:?Set MCP_TOKEN}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL}
     ports:
-      - "${MCP_PORT:-4174}:4174"
+      - "${MCP_PORT:-4174}:<MCP_PORT>"
     volumes:
       - ./data:/app/data:ro
 ```
 
-## Reverse Proxy Notes
-
-For a public connector, route:
+## Reverse Proxy Pattern
 
 ```nginx
 location / {
-  proxy_pass http://127.0.0.1:4173;
+  proxy_pass http://127.0.0.1:<WEB_PORT>;
 }
 
 location /mcp {
-  proxy_pass http://127.0.0.1:4174/mcp;
+  proxy_pass http://127.0.0.1:<MCP_PORT>/mcp;
 }
 ```
 
@@ -323,8 +340,9 @@ Use HTTPS before connecting remote MCP clients.
 
 ## Secret Handling Rules
 
-- Generate different `WEBHOOK_TOKEN`, `MCP_TOKEN`, and admin password for every VPS app.
-- Store real secrets only in `.env`, Hostinger project environment, or a proper secret manager.
-- Do not commit `.env`, API keys, private SSH keys, `openrouter.txt`, or live subscriber data.
-- Rotate tokens after sharing config files with another app/team.
-- Public frontend may call `/api/chat`, but only the server may call OpenRouter.
+- Generate a different `WEBHOOK_TOKEN`, `MCP_TOKEN`, admin password, and API key for every app.
+- Keep real secrets in `.env`, VPS environment variables, or a secret manager.
+- Do not commit `.env`, API keys, private SSH keys, token files, logs, or user data.
+- Never send OpenRouter requests directly from the browser.
+- Rotate tokens after sharing any config with another app or team.
+

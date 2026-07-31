@@ -1343,6 +1343,7 @@ const TREND_STOP_WORDS = new Set([
   "global",
   "have",
   "hacker",
+  "hacker-news",
   "hackernews",
   "hugging",
   "hugging-face",

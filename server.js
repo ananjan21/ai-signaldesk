@@ -1337,6 +1337,7 @@ const TREND_STOP_WORDS = new Set([
   "developer-signal",
   "engineer",
   "engineering",
+  "face",
   "github",
   "for",
   "from",

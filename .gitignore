@@ -1,6 +1,7 @@
 node_modules/
 .env
 openrouter.txt
+local-config.private.json
 data/news.json
 data/leads.json
 data/analytics.json

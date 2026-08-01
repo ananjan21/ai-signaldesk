@@ -102,6 +102,8 @@ The bundled workflows reference a protected `AI SignalDesk Webhook` credential. 
 
 Set `WEBHOOK_TOKEN` before exposing the app to the internet. It protects lead export, feed deletion, and any ingestion request when configured.
 
+Every incoming post source is checked before it is saved. SignalDesk rejects non-public addresses (including unsafe redirects), failed HTTP responses, timeouts, and known unavailable-content pages (including subscription-only placeholder pages). Tune this with `SOURCE_CHECK_TIMEOUT_MS` and `SOURCE_CHECK_CONCURRENCY`; keep `SOURCE_CHECK_ENABLED=true` in production. `SOURCE_CHECK_ALLOW_403_HOSTS` is limited to providers such as Remotive whose API confirms a listing while their website blocks automated requests.
+
 ## Health, Analytics, and Exports
 
 Health check:

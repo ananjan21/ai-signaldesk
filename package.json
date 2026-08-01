@@ -8,6 +8,8 @@
     "dev": "node server.js",
     "mcp": "node mcp-server.mjs",
     "mcp:http": "node mcp-server.mjs --http",
+    "test": "node --test test/source-validation.test.cjs && node qa/chat-render-smoke.cjs",
+    "test:source-links": "node --test test/source-validation.test.cjs",
     "test:chat-format": "node qa/chat-render-smoke.cjs"
   },
   "engines": {

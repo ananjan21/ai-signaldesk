@@ -79,6 +79,10 @@ npm start
 |---|---:|---|---|
 | `PORT` | No | `4173` | Local HTTP server port. |
 | `WEBHOOK_TOKEN` | No | empty | Protects ingestion endpoint and lead export when set. |
+| `SOURCE_CHECK_ENABLED` | No | `true` | Checks source reachability before accepting feed items. |
+| `SOURCE_CHECK_TIMEOUT_MS` | No | `8000` | Per-source validation timeout. |
+| `SOURCE_CHECK_CONCURRENCY` | No | `8` | Maximum simultaneous source checks. |
+| `SOURCE_CHECK_ALLOW_403_HOSTS` | No | `remotive.com` | Providers whose API confirms listings but whose pages block automated checks. |
 | `N8N_LIVE_WEBHOOK_URL` | No | `https://n8n.ailabworks.tech/webhook/ai-opportunity-real-data-pull-v2` | Remote n8n webhook used by the homepage live update button. |
 | `N8N_LIVE_WEBHOOK_TOKEN` | No | empty | Optional token sent as `x-live-update-token` to n8n live webhook. |
 | `OPENROUTER_API_KEY` | Yes for chat | empty | Enables `/api/chat` and the homepage chatbot. |
@@ -92,8 +96,8 @@ Important: `openrouter.txt` appears to be a local credential/helper file. Keep i
 
 1. n8n collects AI opportunities from external sources.
 2. n8n posts JSON items to `POST /api/posts/daily`.
-3. `server.js` normalizes incoming payloads into a consistent post schema.
-4. Posts are deduplicated by `id`, sorted by `publishedAt` descending, and saved to `data/news.json`.
+3. `server.js` normalizes incoming payloads and verifies that every source link is public and reachable.
+4. Unavailable sources are rejected; accepted posts are deduplicated by `id`, sorted by `publishedAt` descending, and saved to `data/news.json`.
 5. The frontend fetches `GET /api/posts`, renders the dashboard, and refreshes every 60 seconds.
 6. Users can filter, search, view post detail pages, subscribe to daily email, request live updates, and ask the AI copilot questions.
 

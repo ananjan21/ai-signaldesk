@@ -3,6 +3,7 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 const crypto = require("node:crypto");
 const nodemailer = require("nodemailer");
+const { validateReachableSources } = require("./source-validation");
 
 const PORT = Number(process.env.PORT || 4173);
 const WEBHOOK_TOKEN = process.env.WEBHOOK_TOKEN || "";
@@ -36,6 +37,13 @@ const MAX_POSTS_PER_REQUEST = Number(process.env.MAX_POSTS_PER_REQUEST || 50);
 const FUTURE_DATE_TOLERANCE_DAYS = Number(process.env.FUTURE_DATE_TOLERANCE_DAYS || 30);
 const RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
 const LIVE_UPDATE_TIMEOUT_MS = Number(process.env.LIVE_UPDATE_TIMEOUT_MS || 25 * 1000);
+const SOURCE_CHECK_ENABLED = String(process.env.SOURCE_CHECK_ENABLED || "true").toLowerCase() !== "false";
+const SOURCE_CHECK_TIMEOUT_MS = Number(process.env.SOURCE_CHECK_TIMEOUT_MS || 8 * 1000);
+const SOURCE_CHECK_CONCURRENCY = Number(process.env.SOURCE_CHECK_CONCURRENCY || 8);
+const SOURCE_CHECK_ALLOW_403_HOSTS = String(process.env.SOURCE_CHECK_ALLOW_403_HOSTS || "remotive.com")
+  .split(",")
+  .map((host) => host.trim().toLowerCase())
+  .filter(Boolean);
 
 const rateLimitBuckets = new Map();
 
@@ -530,7 +538,7 @@ function validateItem(item) {
   if (!item.id || item.id.length < 3) errors.push("id is required.");
   if (!item.title || item.title.length < 3) errors.push("title is required.");
   if (!item.summary && !item.content) errors.push("summary or content is required.");
-  if (!validHttpUrl(item.link)) errors.push("link must be a valid http or https URL.");
+  if (!validHttpUrl(item.link, false)) errors.push("link must be a valid http or https URL.");
   if (!validHttpUrl(item.imageUrl)) errors.push("imageUrl must be a valid http or https URL.");
   if (Number.isNaN(new Date(item.publishedAt).getTime())) errors.push("publishedAt must be a valid date.");
   return errors;
@@ -604,7 +612,7 @@ async function fetchFallbackLiveSignals() {
         id: `openalex-${work.id}`.replace(/[^a-zA-Z0-9-]/g, "-").slice(0, 140),
         title: work.title,
         company: "OpenAlex",
-        link: work.doi || work.primary_location?.landing_page_url || work.id,
+        link: work.doi || work.id || work.primary_location?.landing_page_url,
         summary: cleanText(work.abstract_inverted_index ? "Recent AI research publication indexed by OpenAlex." : "Recent AI research signal from OpenAlex.", 420),
         content: work.title,
         location: "Global",
@@ -665,17 +673,39 @@ async function saveIncomingItems(incoming, analyticsType, analyticsMeta = {}) {
     .filter((result) => result.errors.length);
   if (validationErrors.length) return { ok: false, validationErrors };
 
-  const saved = await mergeAndStoreItems(normalized, analyticsType);
+  const sourceAudit = SOURCE_CHECK_ENABLED
+    ? await validateReachableSources(normalized, {
+        timeoutMs: SOURCE_CHECK_TIMEOUT_MS,
+        concurrency: SOURCE_CHECK_CONCURRENCY,
+        allowStatusesByHostname: Object.fromEntries(SOURCE_CHECK_ALLOW_403_HOSTS.map((host) => [host, [403]])),
+      })
+    : { accepted: normalized, rejected: [] };
+  if (!sourceAudit.accepted.length) {
+    return {
+      ok: false,
+      validationErrors: sourceAudit.rejected.map((result) => ({ index: result.index, errors: [result.reason] })),
+      rejectedSources: sourceAudit.rejected,
+    };
+  }
+
+  const saved = await mergeAndStoreItems(sourceAudit.accepted, analyticsType);
   await appendAnalytics({
     id: crypto.randomUUID(),
     type: analyticsType,
-    received: normalized.length,
+    received: sourceAudit.accepted.length,
+    rejectedSources: sourceAudit.rejected.length,
     total: saved.total,
     archive: saved.archive,
     at: new Date().toISOString(),
     ...analyticsMeta,
   });
-  return { ok: true, normalized, total: saved.total, archive: saved.archive };
+  return {
+    ok: true,
+    normalized: sourceAudit.accepted,
+    rejectedSources: sourceAudit.rejected,
+    total: saved.total,
+    archive: saved.archive,
+  };
 }
 
 function sanitizeStoredItem(item) {
@@ -1362,6 +1392,7 @@ async function handleLiveUpdate(req, res) {
       message: "Live update finished and saved real agentic AI data.",
       provider: "agentic-ai",
       received: saved.normalized.length,
+      rejectedSources: saved.rejectedSources,
       total: saved.total,
       counts: payload?.counts || null,
     });
@@ -1405,6 +1436,7 @@ async function handleLiveUpdate(req, res) {
         ? "Live update saved direct public-source data because agentic AI returned no posts."
         : "Agentic AI live update failed, so SignalDesk saved direct public-source data.",
       received: saved.normalized.length,
+      rejectedSources: saved.rejectedSources,
       total: saved.total,
       agenticAiResponse: text.slice(0, 500),
       sourceFailures: fallback.failures,
@@ -1435,25 +1467,25 @@ async function handleWebhook(req, res) {
       error: `Too many posts in one request. Maximum is ${MAX_POSTS_PER_REQUEST}.`,
     });
   }
-  const normalized = incoming.map(normalizeItem);
-  const validationErrors = normalized
-    .map((item, index) => ({ index, errors: validateItem(item) }))
-    .filter((result) => result.errors.length);
-  if (validationErrors.length) {
-    return json(res, 422, { ok: false, error: "One or more posts are invalid.", validationErrors });
+  const saved = await saveIncomingItems(incoming, "webhook_publish_success", {
+    authorized: Boolean(WEBHOOK_TOKEN),
+  });
+  if (!saved.ok) {
+    return json(res, 422, {
+      ok: false,
+      error: "No posts with valid, reachable source links were accepted.",
+      validationErrors: saved.validationErrors,
+      rejectedSources: saved.rejectedSources || [],
+    });
   }
-  const saved = await mergeAndStoreItems(normalized, "webhook_publish_success");
-  await appendAnalytics({
-    id: crypto.randomUUID(),
-    type: "webhook_publish_success",
-    received: normalized.length,
+
+  return json(res, 201, {
+    ok: true,
+    received: saved.normalized.length,
+    rejectedSources: saved.rejectedSources,
     total: saved.total,
     archive: saved.archive,
-    authorized: Boolean(WEBHOOK_TOKEN),
-    at: new Date().toISOString(),
   });
-
-  return json(res, 201, { ok: true, received: normalized.length, total: saved.total, archive: saved.archive });
 }
 
 function csvCell(value) {

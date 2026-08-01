@@ -176,6 +176,15 @@ GET /api/digest/daily
 
 That returns `subject`, `preheader`, `html`, `text`, `counts`, and top feed `items`. Use the `html` field as the email body in a Gmail, SMTP, or SendGrid node.
 
+Daily subscriber delivery is started by the protected automation endpoint:
+
+```text
+POST /api/automation/send-daily-digest
+x-webhook-token: <WEBHOOK_TOKEN>
+```
+
+Use `{ "dryRun": true }` to check recipient and post counts without sending email. A normal run sends only to active, non-bounced daily email subscribers. Successful delivery is recorded per subscriber and India calendar date, so a repeated run skips recipients who already received that day's digest while failed recipients remain eligible for retry.
+
 When `WEBHOOK_TOKEN` is set, leads can be exported for an agentic AI digest workflow with:
 
 ```text
@@ -306,11 +315,15 @@ It collects real data from:
 - Hacker News / Algolia AI agent and startup/tool signals
 - OpenAlex recent AI research works
 
-It runs at:
+The daily production sequence uses the `Asia/Kolkata` timezone:
 
 ```text
-7:00 AM daily
+6:40 AM - core jobs, research, products, and startup signals
+6:50 AM - prompt trends, image prompts, and visual marketing ideas
+7:00 AM - subscriber email digest
 ```
+
+The publishing workflows finish before email delivery, giving subscribers a complete and current digest at 7:00 AM IST.
 
 It also exposes a live webhook path:
 

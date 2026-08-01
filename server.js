@@ -53,6 +53,7 @@ const mimeTypes = {
 
 const storageWriteQueues = new Map();
 let itemMergeQueue = Promise.resolve();
+let scheduledDigestRunning = false;
 
 function send(res, status, body, headers = {}) {
   res.writeHead(status, {
@@ -723,6 +724,10 @@ function normalizeLead(input) {
     emailForwardCount: Math.max(0, Number(input.emailForwardCount || input.emailForwards || 0) || 0),
     lastEmailForwardedAt: cleanText(input.lastEmailForwardedAt || "", 60) || null,
     lastEmailSubject: cleanText(input.lastEmailSubject || "", 180),
+    lastScheduledDigestDate: cleanText(input.lastScheduledDigestDate || "", 10),
+    lastScheduledDigestAt: cleanText(input.lastScheduledDigestAt || "", 60) || null,
+    lastScheduledDigestStatus: cleanText(input.lastScheduledDigestStatus || "", 30),
+    lastScheduledDigestError: cleanText(input.lastScheduledDigestError || "", 500),
     adminNotes: cleanText(input.adminNotes || "", 1000),
     adminTags: normalizeArray(input.adminTags).map((tag) => cleanText(tag, 60)),
     bounced: input.bounced === true,
@@ -751,6 +756,10 @@ function sanitizeLead(lead) {
     emailForwardCount: Math.max(0, Number(lead.emailForwardCount || lead.emailForwards || 0) || 0),
     lastEmailForwardedAt: cleanText(lead.lastEmailForwardedAt || "", 60) || null,
     lastEmailSubject: cleanText(lead.lastEmailSubject || "", 180),
+    lastScheduledDigestDate: cleanText(lead.lastScheduledDigestDate || "", 10),
+    lastScheduledDigestAt: cleanText(lead.lastScheduledDigestAt || "", 60) || null,
+    lastScheduledDigestStatus: cleanText(lead.lastScheduledDigestStatus || "", 30),
+    lastScheduledDigestError: cleanText(lead.lastScheduledDigestError || "", 500),
     adminNotes: cleanText(lead.adminNotes || "", 1000),
     adminTags: normalizeArray(lead.adminTags).map((tag) => cleanText(tag, 60)),
     bounced: lead.bounced === true,
@@ -1024,6 +1033,17 @@ function formatEmailDate(value = new Date()) {
   }).format(new Date(value));
 }
 
+function indiaDateKey(value = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(value));
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
 function groupDigestItems(items) {
   const order = ["Jobs", "Research", "AI Products", "Prompts", "Image Prompts", "News", "Updates", "Startup News"];
   const groups = new Map(order.map((category) => [category, []]));
@@ -1231,6 +1251,14 @@ function renderWelcomeEmailHtml(lead, items) {
   return digestHtml.replace(
     "Here is today's formatted AI opportunity brief, ranked for action and grouped by market signal.",
     `Hi ${escapeHtml(lead.name || lead.email)}, your subscription is active. Here is today's formatted AI opportunity brief, ranked for action and grouped by market signal.`,
+  );
+}
+
+function renderSubscriberDigestHtml(lead, items) {
+  const digestHtml = renderDailyDigestHtml(items);
+  return digestHtml.replace(
+    "Here is today's formatted AI opportunity brief, ranked for action and grouped by market signal.",
+    `Hi ${escapeHtml(lead.name || "there")}, here is today's AI opportunity brief, ranked for action and grouped by market signal.`,
   );
 }
 
@@ -1877,6 +1905,140 @@ async function handleAdminSendTestEmail(req, res) {
   }
 }
 
+async function handleScheduledDailyDigest(req, res) {
+  const auth = requireWebhookToken(req, res);
+  if (!auth.ok) return auth.response;
+
+  const body = await readBody(req);
+  const requestedDateKey = cleanText(body.dateKey || "", 10);
+  const dateKey = /^\d{4}-\d{2}-\d{2}$/.test(requestedDateKey) ? requestedDateKey : indiaDateKey();
+  const force = body.force === true;
+  const dryRun = body.dryRun === true;
+  const [leads, items] = await Promise.all([readLeads(), readItems()]);
+  const topItems = items.slice(0, 24);
+  const candidates = leads
+    .map((lead, index) => ({ lead: sanitizeLead(lead), index }))
+    .filter(({ lead }) =>
+      lead.subscribed &&
+      !lead.bounced &&
+      lead.channel === "email" &&
+      lead.frequency === "daily" &&
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email),
+    );
+  const pending = candidates.filter(
+    ({ lead }) => force || lead.lastScheduledDigestDate !== dateKey || lead.lastScheduledDigestStatus !== "sent",
+  );
+  const skipped = candidates.length - pending.length;
+
+  if (dryRun) {
+    return json(res, 200, {
+      ok: true,
+      dryRun: true,
+      dateKey,
+      candidates: candidates.length,
+      pending: pending.length,
+      skipped,
+      posts: topItems.length,
+    });
+  }
+
+  if (!topItems.length) {
+    return json(res, 409, { ok: false, error: "The daily feed is empty. Digest delivery was not started." });
+  }
+  if (!mailConfigured()) {
+    return json(res, 503, { ok: false, error: "Email delivery is not configured on the server." });
+  }
+  if (scheduledDigestRunning) {
+    return json(res, 409, { ok: false, error: "A scheduled digest delivery is already running." });
+  }
+  scheduledDigestRunning = true;
+
+  try {
+    const subject = `Daily AI Opportunity Intelligence - ${formatEmailDate()}`;
+    const results = [];
+    for (const { lead, index } of pending) {
+      const startedAt = new Date().toISOString();
+      try {
+        const delivery = await sendMail({
+          to: lead.email,
+          subject,
+          html: renderSubscriberDigestHtml(lead, topItems),
+          text: `Hi ${lead.name || "there"},\n\n${renderDailyDigestText(topItems)}`,
+        });
+        const sentAt = new Date().toISOString();
+        leads[index] = {
+          ...leads[index],
+          emailForwardCount: Number(lead.emailForwardCount || 0) + 1,
+          lastEmailForwardedAt: sentAt,
+          lastEmailSubject: subject,
+          lastScheduledDigestDate: dateKey,
+          lastScheduledDigestAt: sentAt,
+          lastScheduledDigestStatus: "sent",
+          lastScheduledDigestError: "",
+          updatedAt: sentAt,
+        };
+        await writeLeads(leads);
+        await appendAnalytics({
+          id: crypto.randomUUID(),
+          type: "scheduled_daily_digest_sent",
+          leadId: lead.id,
+          emailHash: crypto.createHash("sha256").update(lead.email).digest("hex").slice(0, 18),
+          dateKey,
+          subject,
+          messageId: delivery.messageId,
+          startedAt,
+          at: sentAt,
+        });
+        results.push({ leadId: lead.id, status: "sent", messageId: delivery.messageId || "" });
+      } catch (error) {
+        const failedAt = new Date().toISOString();
+        const errorMessage = cleanText(error.message || "Daily digest delivery failed.", 500);
+        leads[index] = {
+          ...leads[index],
+          lastScheduledDigestDate: dateKey,
+          lastScheduledDigestAt: failedAt,
+          lastScheduledDigestStatus: "failed",
+          lastScheduledDigestError: errorMessage,
+          updatedAt: failedAt,
+        };
+        await writeLeads(leads);
+        await appendAnalytics({
+          id: crypto.randomUUID(),
+          type: "scheduled_daily_digest_failed",
+          leadId: lead.id,
+          emailHash: crypto.createHash("sha256").update(lead.email).digest("hex").slice(0, 18),
+          dateKey,
+          subject,
+          error: errorMessage,
+          startedAt,
+          at: failedAt,
+        });
+        logError("Scheduled daily digest failed", error, { leadId: lead.id, dateKey });
+        results.push({ leadId: lead.id, status: "failed", error: errorMessage });
+      }
+    }
+
+    const sent = results.filter((result) => result.status === "sent").length;
+    const failed = results.length - sent;
+    if (results.length) {
+      await writeLeads(leads.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt)));
+    }
+    return json(res, failed && !sent ? 502 : failed ? 207 : 200, {
+      ok: failed === 0,
+      dateKey,
+      candidates: candidates.length,
+      pending: pending.length,
+      sent,
+      failed,
+      skipped,
+      posts: topItems.length,
+      results,
+    });
+  } finally {
+    scheduledDigestRunning = false;
+  }
+}
+
 async function handleAdminSubscriberUpdate(req, res) {
   const auth = requireAdminAuth(req, res);
   if (!auth.ok) return auth.response;
@@ -2126,6 +2288,10 @@ async function handleApi(req, res, url) {
 
   if (url.pathname === "/api/admin/send-test-email" && req.method === "POST") {
     return handleAdminSendTestEmail(req, res);
+  }
+
+  if (url.pathname === "/api/automation/send-daily-digest" && req.method === "POST") {
+    return handleScheduledDailyDigest(req, res);
   }
 
   if (url.pathname === "/api/admin/subscriber" && req.method === "PATCH") {
